@@ -6,6 +6,7 @@ import {
 import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino } from "./treino.js";
 import { telaPrint } from "./print.js";
 import { telaEvolucao, telaAvaliacao, telaMedirCasa, telaSemana } from "./evolucao.js";
+import { telaClientes, telaCliente, telaNovoCliente } from "./admin.js";
 
 // ---------- cliques e mudanças (delegação) ----------
 document.addEventListener("click", (e) => {
@@ -31,10 +32,19 @@ async function rota() {
   if (limpeza.fn) { try { limpeza.fn(); } catch { /* */ } limpeza.fn = null; }
   if (!configOk) return telaConfig();
   if (!sessao.user) return telaLogin();
+  if (!sessao.perfil || sessao.perfil.id !== sessao.user.id) {
+    try { sessao.perfil = q(await sb.from("perfis").select("*").eq("id", sessao.user.id).maybeSingle()); }
+    catch (e) { erro(e, "Não consegui verificar sua conta"); }
+  }
+  const bloqueio = motivoBloqueio(sessao.perfil);
+  if (bloqueio) return telaBloqueada(bloqueio);
   const [r, a, b] = location.hash.replace(/^#\/?/, "").split("?")[0].split("/");
   const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const admin = sessao.perfil?.papel === "admin";
   try {
     switch (r) {
+      case "clientes": if (admin) return await telaClientes(); break;
+      case "cliente": if (admin) return a === "novo" ? telaNovoCliente() : await telaCliente(a); break;
       case "": case "hoje": return await telaHoje();
       case "ficha": return await telaFicha(a);
       case "ex": return await telaExercicio(a, b);
@@ -49,7 +59,14 @@ async function rota() {
       case "semana": return await telaSemana();
       default: return ir("#/hoje");
     }
+    return ir("#/hoje");
   } catch (e) {
+    // acesso cortado no meio do uso (bloqueio ou vencimento): confere o perfil de novo
+    if (e?.code === "42501") {
+      try { sessao.perfil = q(await sb.from("perfis").select("*").eq("id", sessao.user.id).maybeSingle()); } catch { /* */ }
+      const m = motivoBloqueio(sessao.perfil);
+      if (m) return telaBloqueada(m);
+    }
     erro(e, "Erro ao abrir a tela");
     render(`<section class="tela"><div class="vazio"><p>Não consegui carregar.</p><a class="btn" href="#/hoje">Voltar ao início</a></div></section>`);
   }
@@ -59,7 +76,7 @@ window.addEventListener("hashchange", rota);
 sb.auth.onAuthStateChange((_ev, s) => {
   const antes = sessao.user?.id;
   sessao.user = s?.user || null;
-  if (antes !== sessao.user?.id) rota();
+  if (antes !== sessao.user?.id) { sessao.perfil = null; rota(); }
 });
 (async () => {
   if (configOk) { const { data } = await sb.auth.getSession(); sessao.user = data.session?.user || null; }
@@ -83,27 +100,43 @@ function telaLogin() {
       <label class="campo">E-mail<input class="inp" type="email" name="email" autocomplete="email" required></label>
       <label class="campo">Senha<input class="inp" type="password" name="senha" autocomplete="current-password" minlength="6" required></label>
       <button class="btn pri blk" type="submit">Entrar</button>
-      <button class="btn blk" type="button" data-acao="criarConta">Criar conta</button>
-    </form></section>`);
+    </form>
+    <p class="mini mudo" style="margin:0;text-align:center">Ainda não tem acesso? Fale com quem te vendeu o app.</p></section>`);
 }
 acoes.entrar = async (form) => {
   const f = new FormData(form);
   const { error } = await sb.auth.signInWithPassword({ email: f.get("email"), password: f.get("senha") });
   if (error) toast(error.message.includes("Invalid") ? "E-mail ou senha incorretos" : error.message, 4000);
 };
-acoes.criarConta = async () => {
-  const form = document.querySelector('form[data-envia="entrar"]');
-  if (!form.reportValidity()) return;
-  const f = new FormData(form);
-  const { data, error } = await sb.auth.signUp({ email: f.get("email"), password: f.get("senha") });
-  if (error) return toast(error.message, 4000);
-  if (!data.session) toast("Conta criada. Confirme pelo link que chegou no seu e-mail e depois entre.", 6000);
-};
 acoes.sair = async () => {
   if (!confirm("Sair da conta neste aparelho?")) return;
   salvarTreinoAtivo(null);
   await sb.auth.signOut();
 };
+acoes.sairDireto = async () => { salvarTreinoAtivo(null); await sb.auth.signOut(); };
+acoes.verificarDeNovo = () => { sessao.perfil = null; rota(); };
+
+function motivoBloqueio(p) {
+  if (!p) return "sem-perfil";
+  if (p.papel === "admin") return null;
+  if (!p.ativo) return "bloqueado";
+  const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  if (p.acesso_ate && p.acesso_ate < hoje) return "vencido";
+  return null;
+}
+function telaBloqueada(motivo) {
+  const txt = {
+    "vencido": ["Seu acesso venceu", "Renove com quem te vendeu o app. Seus treinos ficam guardados e voltam assim que o acesso for renovado."],
+    "bloqueado": ["Acesso suspenso", "Fale com quem te vendeu o app para liberar. Seus treinos ficam guardados."],
+    "sem-perfil": ["Conta sem acesso", "Esta conta ainda não foi liberada. Fale com quem te vendeu o app."],
+  }[motivo];
+  render(`<section class="tela" style="justify-content:center">
+    <div class="cartao vazio"><span class="letra g">${ico("info", 28)}</span>
+      <h2>${txt[0]}</h2><p style="margin:0">${txt[1]}</p>
+      <span class="mini mudo">${h(sessao.user?.email || "")}</span>
+      <button class="btn pri blk" data-acao="verificarDeNovo">Já renovei, verificar de novo</button>
+      <button class="btn blk" data-acao="sairDireto">${ico("sair", 18)} Sair</button></div></section>`);
+}
 
 // ---------- dados ----------
 export async function carregarFichas() {

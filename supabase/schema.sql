@@ -89,14 +89,64 @@ create index if not exists idx_series_sessao on public.series_feitas(sessao_id);
 create index if not exists idx_series_ex on public.series_feitas(exercicio_id, feita_em desc);
 create index if not exists idx_sessoes_user on public.sessoes(user_id, inicio desc);
 
--- ---------- Segurança: cada um só vê os próprios dados ----------
+-- ---------- Perfis: quem é admin e se a conta está liberada ----------
+create table if not exists public.perfis (
+  id uuid primary key references auth.users(id) on delete cascade,
+  nome text not null default '',
+  email text not null default '',
+  papel text not null default 'cliente' check (papel in ('admin','cliente')),
+  ativo boolean not null default false,             -- toda conta nasce bloqueada; o admin libera
+  acesso_ate date,                                  -- vazio = não vence
+  criado_em timestamptz not null default now()
+);
+alter table public.perfis enable row level security;
+
+create or replace function public.eh_admin() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.perfis where id = auth.uid() and papel = 'admin' and ativo);
+$$;
+create or replace function public.conta_ativa() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.perfis
+    where id = auth.uid() and ativo
+      and (papel = 'admin' or acesso_ate is null or acesso_ate >= (now() at time zone 'America/Sao_Paulo')::date)
+  );
+$$;
+revoke execute on function public.eh_admin() from public, anon;
+revoke execute on function public.conta_ativa() from public, anon;
+grant execute on function public.eh_admin() to authenticated;
+grant execute on function public.conta_ativa() to authenticated;
+
+drop policy if exists "ver o proprio perfil ou admin" on public.perfis;
+create policy "ver o proprio perfil ou admin" on public.perfis for select to authenticated
+  using (id = (select auth.uid()) or (select public.eh_admin()));
+grant select on public.perfis to authenticated;   -- alterações só pela função "admin"
+
+create or replace function public.criar_perfil() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.perfis (id, email, nome)
+  values (new.id, coalesce(new.email, ''), coalesce(new.raw_user_meta_data->>'nome', ''))
+  on conflict (id) do nothing;
+  return new;
+end $$;
+revoke execute on function public.criar_perfil() from public, anon, authenticated;
+drop trigger if exists ao_criar_usuario on auth.users;
+create trigger ao_criar_usuario after insert on auth.users
+  for each row execute function public.criar_perfil();
+
+-- Para virar admin (troque o e-mail e rode depois de criar sua conta):
+-- update public.perfis set papel = 'admin', ativo = true where email = 'seu@email.com';
+
+-- ---------- Segurança: cada um só vê os próprios dados, e só com a conta liberada ----------
 do $$
 declare t text;
 begin
   foreach t in array array['fichas','exercicios','equipamentos','sessoes','series_feitas','avaliacoes'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "dono" on public.%I', t);
-    execute format('create policy "dono" on public.%I for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
+    execute format('create policy "dono" on public.%I for all to authenticated using (user_id = (select auth.uid()) and (select public.conta_ativa())) with check (user_id = (select auth.uid()) and (select public.conta_ativa()))', t);
     -- projetos novos do Supabase não dão acesso automático às tabelas: libera só para quem está logado
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
   end loop;
@@ -115,10 +165,10 @@ drop policy if exists "fotos do dono - alterar" on storage.objects;
 drop policy if exists "fotos do dono - apagar" on storage.objects;
 
 create policy "fotos do dono - ler" on storage.objects for select to authenticated
-  using (bucket_id = 'fotos' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'fotos' and (storage.foldername(name))[1] = (select auth.uid())::text and (select public.conta_ativa()));
 create policy "fotos do dono - enviar" on storage.objects for insert to authenticated
-  with check (bucket_id = 'fotos' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (bucket_id = 'fotos' and (storage.foldername(name))[1] = (select auth.uid())::text and (select public.conta_ativa()));
 create policy "fotos do dono - alterar" on storage.objects for update to authenticated
-  using (bucket_id = 'fotos' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'fotos' and (storage.foldername(name))[1] = (select auth.uid())::text and (select public.conta_ativa()));
 create policy "fotos do dono - apagar" on storage.objects for delete to authenticated
-  using (bucket_id = 'fotos' and (storage.foldername(name))[1] = auth.uid()::text);
+  using (bucket_id = 'fotos' and (storage.foldername(name))[1] = (select auth.uid())::text and (select public.conta_ativa()));

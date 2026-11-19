@@ -10,7 +10,7 @@ export const configOk = !!(C.SUPABASE_URL && !C.SUPABASE_URL.includes("SEU-PROJE
 export const app = () => document.getElementById("app");
 export const acoes = {};          // data-acao="nome" → acoes.nome(el, evento)
 export const mudancas = {};       // data-muda="nome" → mudancas.nome(el, evento)
-export const sessao = { user: null };
+export const sessao = { user: null, perfil: null };
 export const limpeza = { fn: null };  // parar timers ao trocar de tela
 
 export function render(html) { app().innerHTML = html; window.scrollTo(0, 0); }
@@ -151,6 +151,7 @@ const P = {
   fogo: '<path d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-3 2-4 2-7 2 1 3 3 3 3"/>',
   lixo: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
+  chave: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3M17 6l3 3M14 9l2 2"/>',
   sair: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
 };
 export function ico(nome, tam = 20, extra = "") {
@@ -161,7 +162,8 @@ export function botaoVoltar(hash) {
 }
 export function nav(atual) {
   const it = [["#/hoje", "casa", "Hoje"], ["#/evolucao", "sobe", "Evolução"], ["#/semana", "fogo", "Semana"], ["#/avaliacao", "pessoa", "Avaliação"]];
-  return `<nav class="nav"><div>${it.map(([href, i, t]) => `<a href="${href}" class="${atual === href ? "at" : ""}">${ico(i, 22)}${t}</a>`).join("")}</div></nav>`;
+  if (sessao.perfil?.papel === "admin") it.push(["#/clientes", "chave", "Clientes"]);
+  return `<nav class="nav"><div style="grid-template-columns:repeat(${it.length},minmax(0,1fr))">${it.map(([href, i, t]) => `<a href="${href}" class="${atual === href ? "at" : ""}">${ico(i, 22)}${t}</a>`).join("")}</div></nav>`;
 }
 
 // ---------- grupos musculares (para o resumo da semana) ----------
