@@ -82,15 +82,27 @@ Deno.serve(async (req) => {
     parts.push({ inline_data: { mime_type: im.mime || "image/jpeg", data: im.dados } });
   });
 
+  // Ler uma ficha não precisa de raciocínio longo: pensar pouco deixa a resposta muito mais rápida.
+  let pensarPouco = true;
   const pedir = (m: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
       contents: [{ role: "user", parts }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0 },
+      generationConfig: {
+        responseMimeType: "application/json", temperature: 0,
+        ...(pensarPouco ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
+      },
     }),
   });
+  const t0 = Date.now();
   let r = await pedir(model);
+  // Modelo que não aceita o ajuste de raciocínio: tenta de novo sem ele
+  if (r.status === 400) {
+    const txt = await r.text();
+    if (/thinking/i.test(txt)) { pensarPouco = false; r = await pedir(model); }
+    else r = new Response(txt, { status: 400 });
+  }
   // Modelo aposentado pelo Google: procura o Flash mais novo disponível e tenta de novo
   if (r.status === 404) {
     const novo = await flashMaisNovo(key);
@@ -107,6 +119,7 @@ Deno.serve(async (req) => {
     return json({ erro: `Gemini respondeu ${r.status}`, detalhe: t.slice(0, 500) }, 502);
   }
   const g = await r.json();
+  console.log(`Leitura ok: ${imagens.length} print(s), modelo ${model}, raciocínio ${pensarPouco ? "baixo" : "padrão"}, ${Date.now() - t0} ms`);
   const texto: string = g?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
   try {
     const limpo = texto.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
