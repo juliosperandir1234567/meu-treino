@@ -28,7 +28,8 @@ function delta(atual, antes, bomSubir = true, un = "") {
 // ---------- EVOLUÇÃO ----------
 let medidaSel = null;
 export async function telaEvolucao(aba, exNome) {
-  const avs = q(await sb.from("avaliacoes").select("*").order("data"));
+  // a aba de exercícios não usa as avaliações: não busca à toa
+  const avs = aba === "medidas" || aba === "peso" ? q(await sb.from("avaliacoes").select("*").order("data")) : [];
   let corpo = "";
   if (aba === "medidas") {
     const ult = avs[avs.length - 1], ant = avs[avs.length - 2];
@@ -137,10 +138,21 @@ function chaveManter(exId, carga) { return `manter-${exId}-${carga}`; }
 export async function telaSemana() {
   const ini = inicioSemana();
   const fimSem = new Date(ini); fimSem.setDate(fimSem.getDate() + 6);
-  const sessoes = q(await sb.from("sessoes").select("id, inicio").order("inicio", { ascending: false }).limit(400));
+  // consultas em paralelo: o servidor fica longe, então cada ida e volta em sequência pesa
+  const [rs, rx] = await Promise.all([
+    sb.from("sessoes").select("id, inicio").order("inicio", { ascending: false }).limit(400),
+    sb.from("exercicios").select("id, nome, series, reps, carga_prevista").eq("ativo", true),
+  ]);
+  const sessoes = q(rs), exs = q(rx);
   const daSemana = sessoes.filter((s) => new Date(s.inicio) >= ini);
   const ids = daSemana.map((s) => s.id);
-  const ser = ids.length ? q(await sb.from("series_feitas").select("*").in("sessao_id", ids)) : [];
+  const exIds = exs.map((e) => e.id);
+  const [rser, rhist] = await Promise.all([
+    ids.length ? sb.from("series_feitas").select("*").in("sessao_id", ids) : { data: [] },
+    exIds.length ? sb.from("series_feitas").select("exercicio_id, sessao_id, carga, reps, equipamento_opcao, feita_em").in("exercicio_id", exIds).order("feita_em", { ascending: false }).limit(800) : { data: [] },
+  ]);
+  const ser = q(rser), hist = q(rhist);
+  const recordesP = contarRecordes(ser, ini);
   const volume = ser.reduce((a, x) => a + (Number(x.carga) || 0) * (Number(x.reps) || 0), 0);
 
   // sequência de semanas com pelo menos 1 treino
@@ -159,9 +171,6 @@ export async function telaSemana() {
   }).join("");
 
   // sugestão de carga: bateu o máximo de repetições em todas as séries na última vez
-  const exs = q(await sb.from("exercicios").select("id, nome, series, reps, carga_prevista").eq("ativo", true));
-  const exIds = exs.map((e) => e.id);
-  const hist = exIds.length ? q(await sb.from("series_feitas").select("exercicio_id, sessao_id, carga, reps, equipamento_opcao, feita_em").in("exercicio_id", exIds).order("feita_em", { ascending: false }).limit(800)) : [];
   const sugestoes = [];
   for (const e of exs) {
     const meta = metaReps(e.reps); if (!meta) continue;
@@ -176,7 +185,7 @@ export async function telaSemana() {
     sugestoes.push({ e, carga, nova: carga + (carga >= 40 ? 5 : 2), meta });
   }
 
-  const recordes = await contarRecordes(ser, ini);
+  const recordes = await recordesP;
   render(`<section class="tela">
     <div class="entre" style="align-items:flex-end"><div class="col" style="gap:4px"><span class="peq mudo">${ini.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })} a ${fimSem.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}</span><h1>Sua semana</h1></div>
       <span class="chip" style="color:var(--txt)">${ico("fogo", 14, 'style="color:var(--lar);vertical-align:-2px"')} ${seq} semana${seq === 1 ? "" : "s"} seguida${seq === 1 ? "" : "s"}</span></div>

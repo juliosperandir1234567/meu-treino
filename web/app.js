@@ -1,6 +1,6 @@
 // Meu Treino — rotas, login, tela Hoje, fichas e edição de exercícios.
 import {
-  sb, configOk, sessao, acoes, limpeza, mudancas, render, ir, h, toast, erro, q, num, fmt, kg,
+  sb, configOk, sessao, acoes, limpeza, mudancas, render, mostrarGuardada, esquecerTelas, ir, h, toast, erro, q, num, fmt, kg,
   dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo,
 } from "./util.js";
 import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino } from "./treino.js";
@@ -38,6 +38,7 @@ async function rota() {
   }
   const bloqueio = motivoBloqueio(sessao.perfil);
   if (bloqueio) return telaBloqueada(bloqueio);
+  mostrarGuardada();
   const [r, a, b] = location.hash.replace(/^#\/?/, "").split("?")[0].split("/");
   const params = new URLSearchParams(location.hash.split("?")[1] || "");
   const admin = sessao.perfil?.papel === "admin";
@@ -76,7 +77,7 @@ window.addEventListener("hashchange", rota);
 sb.auth.onAuthStateChange((_ev, s) => {
   const antes = sessao.user?.id;
   sessao.user = s?.user || null;
-  if (antes !== sessao.user?.id) { sessao.perfil = null; rota(); }
+  if (antes !== sessao.user?.id) { sessao.perfil = null; esquecerTelas(); rota(); }
 });
 (async () => {
   if (configOk) { const { data } = await sb.auth.getSession(); sessao.user = data.session?.user || null; }
@@ -140,8 +141,12 @@ function telaBloqueada(motivo) {
 
 // ---------- dados ----------
 export async function carregarFichas() {
-  const fichas = q(await sb.from("fichas").select("*").order("ordem").order("letra"));
-  const exs = q(await sb.from("exercicios").select("id, ficha_id").eq("ativo", true));
+  // as duas consultas vão juntas (o servidor fica longe: cada ida e volta conta)
+  const [rf, re] = await Promise.all([
+    sb.from("fichas").select("*").order("ordem").order("letra"),
+    sb.from("exercicios").select("id, ficha_id").eq("ativo", true),
+  ]);
+  const fichas = q(rf), exs = q(re);
   fichas.forEach((f) => { f.qtd = exs.filter((e) => e.ficha_id === f.id).length; });
   return fichas;
 }
@@ -149,9 +154,12 @@ export async function carregarFichas() {
 // ---------- HOJE ----------
 async function telaHoje() {
   const ativo = treinoAtivo();
-  const fichas = await carregarFichas();
   const ini = inicioSemana();
-  const recentes = q(await sb.from("sessoes").select("id, ficha_id, inicio, fim").order("inicio", { ascending: false }).limit(60));
+  const [fichas, rr] = await Promise.all([
+    carregarFichas(),
+    sb.from("sessoes").select("id, ficha_id, inicio, fim").order("inicio", { ascending: false }).limit(60),
+  ]);
+  const recentes = q(rr);
   const semana = recentes.filter((s) => new Date(s.inicio) >= ini);
   const ultimaPorFicha = {};
   recentes.forEach((s) => { if (s.ficha_id && !ultimaPorFicha[s.ficha_id]) ultimaPorFicha[s.ficha_id] = s.inicio; });
