@@ -153,6 +153,10 @@ begin
 end $$;
 grant usage on schema public to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
+-- a função "admin" usa a chave de servidor (service_role), que também precisa de acesso explícito
+grant usage on schema public to service_role;
+grant select, insert, update, delete on all tables in schema public to service_role;
+grant usage, select on all sequences in schema public to service_role;
 
 -- ---------- Fotos (bucket privado) ----------
 insert into storage.buckets (id, name, public)
