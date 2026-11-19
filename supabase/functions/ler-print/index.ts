@@ -1,7 +1,7 @@
 // Edge Function "ler-print"
 // Recebe 1 a 6 prints (base64) e devolve o treino ou a avaliação física em JSON.
 // Usa a API gratuita do Gemini (Google AI Studio). Segredo necessário: GEMINI_API_KEY
-// Opcional: GEMINI_MODEL (padrão gemini-2.5-flash)
+// Opcional: GEMINI_MODEL (padrão gemini-3.8-flash; se sair do ar, usa sozinho o Flash mais novo)
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const CORS = {
@@ -30,6 +30,22 @@ Regras:
 - "medidas": circunferências em cm, com nomes em português como aparecem (ex.: "Braço direito", "Cintura", "Abdômen", "Coxa esquerda").
 - Use null para o que não aparecer. Nunca invente valores.`;
 
+// Lista os modelos da chave e escolhe o "gemini-X.Y-flash" de versão mais alta que gera conteúdo
+async function flashMaisNovo(key: string): Promise<string | null> {
+  try {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const nomes: string[] = (j.models ?? [])
+      .filter((m: { supportedGenerationMethods?: string[] }) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m: { name: string }) => m.name.replace(/^models\//, ""))
+      .filter((n: string) => /^gemini-\d+(\.\d+)?-flash$/.test(n));
+    const ver = (n: string) => Number(n.match(/^gemini-(\d+(?:\.\d+)?)/)![1]);
+    nomes.sort((a, b) => ver(b) - ver(a));
+    return nomes[0] ?? null;
+  } catch { return null; }
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }
@@ -52,7 +68,7 @@ Deno.serve(async (req) => {
 
   const key = (Deno.env.get("GEMINI_API_KEY") ?? "").trim();
   if (!key) return json({ erro: "Falta configurar o segredo GEMINI_API_KEY no Supabase." }, 500);
-  const model = (Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash").trim();
+  let model = (Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash").trim();
 
   let body: { tipo?: string; imagens?: { mime: string; dados: string }[] };
   try { body = await req.json(); } catch { return json({ erro: "Corpo inválido" }, 400); }
@@ -66,7 +82,7 @@ Deno.serve(async (req) => {
     parts.push({ inline_data: { mime_type: im.mime || "image/jpeg", data: im.dados } });
   });
 
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const pedir = (m: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
@@ -74,6 +90,17 @@ Deno.serve(async (req) => {
       generationConfig: { responseMimeType: "application/json", temperature: 0 },
     }),
   });
+  let r = await pedir(model);
+  // Modelo aposentado pelo Google: procura o Flash mais novo disponível e tenta de novo
+  if (r.status === 404) {
+    const novo = await flashMaisNovo(key);
+    if (novo && novo !== model) {
+      await r.body?.cancel();
+      console.warn(`Modelo ${model} indisponível; usando ${novo}. Dica: crie o segredo GEMINI_MODEL=${novo}`);
+      model = novo;
+      r = await pedir(model);
+    }
+  }
   if (!r.ok) {
     const t = await r.text();
     console.error(`Gemini ${r.status} (modelo ${model}): ${t.slice(0, 800)}`);
