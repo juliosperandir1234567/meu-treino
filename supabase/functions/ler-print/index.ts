@@ -46,9 +46,13 @@ Deno.serve(async (req) => {
   const { data: u, error: ue } = await sb.auth.getUser(auth.replace(/^Bearer\s+/i, ""));
   if (ue || !u?.user) return json({ erro: "Faça login de novo." }, 401);
 
-  const key = Deno.env.get("GEMINI_API_KEY");
+  // Conta bloqueada ou vencida não usa a leitura (economiza a cota do Gemini)
+  const { data: ativa } = await sb.rpc("conta_ativa");
+  if (ativa !== true) return json({ erro: "Seu acesso está suspenso ou vencido." }, 403);
+
+  const key = (Deno.env.get("GEMINI_API_KEY") ?? "").trim();
   if (!key) return json({ erro: "Falta configurar o segredo GEMINI_API_KEY no Supabase." }, 500);
-  const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
+  const model = (Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash").trim();
 
   let body: { tipo?: string; imagens?: { mime: string; dados: string }[] };
   try { body = await req.json(); } catch { return json({ erro: "Corpo inválido" }, 400); }
@@ -72,6 +76,7 @@ Deno.serve(async (req) => {
   });
   if (!r.ok) {
     const t = await r.text();
+    console.error(`Gemini ${r.status} (modelo ${model}): ${t.slice(0, 800)}`);
     return json({ erro: `Gemini respondeu ${r.status}`, detalhe: t.slice(0, 500) }, 502);
   }
   const g = await r.json();
