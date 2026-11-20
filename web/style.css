@@ -193,3 +193,4 @@ canvas.prev { width: 100%; max-width: 280px; border-radius: 16px; align-self: ce
 .ficha-item.prox { border-color: rgba(198,244,50,.45); }
 .ficha-item.prox .letra { background: rgba(198,244,50,.14); color: var(--ac); }
 .item.tracejado { background: transparent; border-style: dashed; }
+.nome-btn { background: none; border: 0; padding: 0; text-align: left; color: var(--txt); }

@@ -237,7 +237,9 @@ async function telaHoje() {
   }
 
   render(`<section class="tela">
-    <div class="entre"><div class="col" style="gap:4px"><span class="peq mudo">${dataLonga()}</span><h1>${saudacao()}</h1></div>
+    <div class="entre"><div class="col" style="gap:4px"><span class="peq mudo">${dataLonga()}</span>
+      <button class="nome-btn" data-acao="meuNome" aria-label="Trocar meu nome"><h1>${saudacao()}</h1></button>
+      ${(sessao.perfil?.nome || "").trim() ? "" : `<button class="btn peq" style="align-self:flex-start" data-acao="meuNome">${ico("pessoa", 16)} Como quer ser chamado?</button>`}</div>
       <button class="ico" data-acao="sair" aria-label="Sair da conta">${ico("sair")}</button></div>
     ${destaque}
     <a class="cartao semana-cartao" href="#/semana">
@@ -254,6 +256,14 @@ async function telaHoje() {
   </section>
   ${nav("#/hoje")}`);
 }
+acoes.meuNome = async () => {
+  const atual = (sessao.perfil?.nome || "").trim();
+  const novo = prompt("Como você quer ser chamado?", atual);
+  if (novo === null || novo.trim() === atual) return;
+  q(await sb.rpc("definir_meu_nome", { novo: novo.trim() }));
+  if (sessao.perfil) sessao.perfil.nome = novo.trim();
+  toast("Nome salvo"); telaHoje();
+};
 acoes.iniciar = async (el) => { await iniciarTreino(el.dataset.ficha); };
 acoes.novaFicha = async () => {
   const fichas = q(await sb.from("fichas").select("letra, ordem"));

@@ -193,3 +193,11 @@ language sql stable security invoker set search_path = '' as $$
 $$;
 revoke execute on function public.minhas_estatisticas() from public, anon;
 grant execute on function public.minhas_estatisticas() to authenticated;
+
+-- ---------- Cada pessoa pode trocar só o próprio nome (o resto do perfil fica com o admin) ----------
+create or replace function public.definir_meu_nome(novo text) returns void
+language sql volatile security definer set search_path = '' as $$
+  update public.perfis set nome = left(btrim(coalesce(novo, '')), 60) where id = auth.uid();
+$$;
+revoke execute on function public.definir_meu_nome(text) from public, anon;
+grant execute on function public.definir_meu_nome(text) to authenticated;
