@@ -260,7 +260,7 @@ export async function telaSemana() {
     <div class="grade3"><div class="stat"><span class="mini mudo">Treinos</span><span class="v">${d.treinos}</span>${pctTxt(d.treinos, d.treinosAnt)}</div>
       <div class="stat"><span class="mini mudo">Volume</span><span class="v">${volumeTxt(d.volume)}</span>${pctTxt(d.volume, d.volumeAnt)}</div>
       <div class="stat"><span class="mini mudo">Recordes</span><span class="v ac">${d.recordes}</span><span class="mini mudo">nesta semana</span></div></div>
-    <div class="cartao"><div class="entre"><b>${unid} por dia</b><span class="legenda"><span><i style="background:#3A3F47"></i>Passada</span><span><i style="background:var(--ac)"></i>Esta</span></span></div>
+    <div class="cartao"><div class="entre"><b>${unid} por dia</b><span class="legenda"><span><i style="background:#C9D3E1"></i>Passada</span><span><i style="background:var(--ac)"></i>Esta</span></span></div>
       ${d.series || d.seriesAnt ? barrasSemana(d.dia, d.diaAnt, ["S", "T", "Q", "Q", "S", "S", "D"]) : `<span class="mudo peq">Faça um treino para ver o gráfico.</span>`}</div>
     <div class="cartao"><div class="entre"><b>Músculos da semana</b><span class="mini mudo">mais forte = mais séries</span></div>
       ${corpoSvg(pctGrupos(d.grupos))}

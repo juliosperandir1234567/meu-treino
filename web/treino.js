@@ -113,11 +113,11 @@ function desenharTreino(rolar = false) {
 
   const avisos = D.avisos.filter((a) => a.exId === ex.id).map((a) => a.tipo === "acima" ? `
     <div class="cartao ac-borda" role="status"><div class="linha" style="align-items:flex-start">
-      <span class="ico" style="width:32px;height:32px;border:0;background:rgba(198,244,50,.14);color:var(--ac)">${ico("cima", 18)}</span>
+      <span class="ico" style="width:32px;height:32px;border:0;background:rgba(37,99,235,.12);color:var(--ac)">${ico("cima", 18)}</span>
       <div class="col" style="gap:2px"><b>Você aumentou a carga</b><span class="peq mudo">${kg(a.carga)} na série ${a.n}. ${a.refTxt}. Usar ${kg(a.carga)} daqui pra frente?</span></div></div>
       <div class="grade2"><button class="btn pri peq" data-acao="novaCarga" data-carga="${a.carga}">Sim, nova carga</button><button class="btn peq" data-acao="fecharAviso" data-id="${a.id}">Só hoje</button></div></div>` : `
     <div class="cartao lar-borda" role="status"><div class="linha" style="align-items:flex-start">
-      <span class="ico" style="width:32px;height:32px;border:0;background:rgba(255,181,71,.14);color:var(--lar)">${ico(a.tipo === "menosCarga" ? "baixo" : "baixo", 18)}</span>
+      <span class="ico" style="width:32px;height:32px;border:0;background:rgba(217,119,6,.12);color:var(--lar)">${ico(a.tipo === "menosCarga" ? "baixo" : "baixo", 18)}</span>
       <div class="col" style="gap:2px"><b>Abaixo do previsto</b><span class="peq mudo">${a.txt}</span></div>
       <button class="ico" style="width:32px;height:32px;margin-left:auto" data-acao="fecharAviso" data-id="${a.id}" aria-label="Fechar aviso">✕</button></div></div>`).join("");
 
@@ -474,7 +474,7 @@ async function desenharCard({ s, ser, volume, recordes }, foto) {
   cv.width = W; cv.height = H;
   const c = cv.getContext("2d");
   try { await document.fonts.ready; } catch { /* */ }
-  c.fillStyle = "#17191C"; c.fillRect(0, 0, W, H);
+  c.fillStyle = "#111A2E"; c.fillRect(0, 0, W, H);
   if (foto && formato !== "numeros") {
     try {
       const img = await carregarImagem(foto);
@@ -483,13 +483,13 @@ async function desenharCard({ s, ser, volume, recordes }, foto) {
       c.drawImage(img, (W - w) / 2, (H - hh) / 2, w, hh);
     } catch { /* foto indisponível */ }
     const g = c.createLinearGradient(0, H * 0.45, 0, H);
-    g.addColorStop(0, "rgba(14,15,17,0)"); g.addColorStop(0.5, "rgba(14,15,17,.85)"); g.addColorStop(1, "rgba(14,15,17,.95)");
+    g.addColorStop(0, "rgba(11,18,32,0)"); g.addColorStop(0.5, "rgba(11,18,32,.85)"); g.addColorStop(1, "rgba(11,18,32,.95)");
     c.fillStyle = g; c.fillRect(0, 0, W, H);
-    const g2 = c.createLinearGradient(0, 0, 0, 260); g2.addColorStop(0, "rgba(14,15,17,.6)"); g2.addColorStop(1, "rgba(14,15,17,0)");
+    const g2 = c.createLinearGradient(0, 0, 0, 260); g2.addColorStop(0, "rgba(11,18,32,.6)"); g2.addColorStop(1, "rgba(11,18,32,0)");
     c.fillStyle = g2; c.fillRect(0, 0, W, 260);
   } else {
-    c.fillStyle = "#0E0F11"; c.fillRect(0, 0, W, H);
-    c.strokeStyle = "#C6F432"; c.lineWidth = 6; c.globalAlpha = .15;
+    c.fillStyle = "#0B1220"; c.fillRect(0, 0, W, H);
+    c.strokeStyle = "#3B82F6"; c.lineWidth = 6; c.globalAlpha = .15;
     for (let i = -H; i < W; i += 90) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i + H, H); c.stroke(); }
     c.globalAlpha = 1;
   }
@@ -500,14 +500,14 @@ async function desenharCard({ s, ser, volume, recordes }, foto) {
   if (letra) {
     c.font = "700 36px Inter, sans-serif";
     const txt = `Treino ${letra}`, tw = c.measureText(txt).width + 48;
-    c.fillStyle = "#C6F432"; roundRect(c, W - M - tw, M - 6, tw, 64, 32); c.fill();
-    c.fillStyle = "#0E0F11"; c.fillText(txt, W - M - tw + 24, M + 8);
+    c.fillStyle = "#3B82F6"; roundRect(c, W - M - tw, M - 6, tw, 64, 32); c.fill();
+    c.fillStyle = "#FFFFFF"; c.fillText(txt, W - M - tw + 24, M + 8);
   }
   const titulo = s.ficha_nome.replace(/^Treino\s+\S+\s*·?\s*/, "") || s.ficha_nome;
   const base = H - M;
   let y = base - (recordes.length ? 70 : 0);
   if (recordes.length) {
-    c.fillStyle = "#C6F432"; c.font = "600 38px Inter, sans-serif"; c.textBaseline = "bottom";
+    c.fillStyle = "#3B82F6"; c.font = "600 38px Inter, sans-serif"; c.textBaseline = "bottom";
     const r = recordes[0];
     c.fillText(`Recorde: ${r.nome} ${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`.slice(0, 48), M, base);
   }

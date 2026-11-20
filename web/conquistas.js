@@ -127,8 +127,8 @@ export async function desenharSemana(d) {
   cv.width = W; cv.height = H;
   const c = cv.getContext("2d");
   try { await document.fonts.ready; } catch { /* */ }
-  const ACC = "#C6F432", TXT = "#F2F3F5", MUDO = "#B8BDC4";
-  c.fillStyle = "#0E0F11"; c.fillRect(0, 0, W, H);
+  const ACC = "#3B82F6", TXT = "#F2F3F5", MUDO = "#B8BDC4";
+  c.fillStyle = "#0B1220"; c.fillRect(0, 0, W, H);
   c.strokeStyle = ACC; c.lineWidth = 6; c.globalAlpha = .08;
   for (let i = -H; i < W; i += 90) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i + H, H); c.stroke(); }
   c.globalAlpha = 1;
@@ -139,7 +139,7 @@ export async function desenharSemana(d) {
     c.font = "700 34px Inter, sans-serif";
     const t = `🔥 ${d.seq} semana${d.seq === 1 ? "" : "s"} seguida${d.seq === 1 ? "" : "s"}`, tw = c.measureText(t).width + 48;
     c.fillStyle = ACC; roundRect(c, W - M - tw, M - 6, tw, 62, 31); c.fill();
-    c.fillStyle = "#0E0F11"; c.fillText(t, W - M - tw + 24, M + 8);
+    c.fillStyle = "#FFFFFF"; c.fillText(t, W - M - tw + 24, M + 8);
   }
   let y = M + (story ? 150 : 110);
   c.fillStyle = MUDO; c.font = "500 36px Inter, sans-serif";

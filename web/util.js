@@ -215,9 +215,9 @@ export function grafico(valores, rotulos = []) {
   const pts = valores.map((x, i) => x === null ? null : [p + (i * (W - 2 * p)) / (valores.length - 1), H - p - ((x - min) / d) * (H - 2 * p)]).filter(Boolean);
   const ult = pts[pts.length - 1];
   return `<svg class="graf" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Gráfico de ${fmt(v[0])} a ${fmt(v[v.length - 1])}">
-    <line x1="0" y1="${p}" x2="${W}" y2="${p}" stroke="#2A2E34"/><line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#2A2E34"/><line x1="0" y1="${H - p}" x2="${W}" y2="${H - p}" stroke="#2A2E34"/>
-    <polyline points="${pts.map((x) => x.join(",")).join(" ")}" fill="none" stroke="#C6F432" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-    <circle cx="${ult[0]}" cy="${ult[1]}" r="4" fill="#C6F432"/></svg>
+    <line x1="0" y1="${p}" x2="${W}" y2="${p}" stroke="#E1E7F0"/><line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#E1E7F0"/><line x1="0" y1="${H - p}" x2="${W}" y2="${H - p}" stroke="#E1E7F0"/>
+    <polyline points="${pts.map((x) => x.join(",")).join(" ")}" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <circle cx="${ult[0]}" cy="${ult[1]}" r="4" fill="#2563EB"/></svg>
     ${rotulos.length ? `<div class="entre mini mudo"><span>${h(rotulos[0])}</span><span>${h(rotulos[rotulos.length - 1])}</span></div>` : ""}`;
 }
 
@@ -248,7 +248,7 @@ export async function manterTelaLigada(on) {
 // ---------- comemoração (recordes e conquistas) ----------
 export function comemorar(titulo, sub = "") {
   document.getElementById("festa")?.remove();
-  const cores = ["#C6F432", "#FFB547", "#F2F3F5", "#7CD4FF", "#FF7AA8"];
+  const cores = ["#2563EB", "#F59E0B", "#10B981", "#60A5FA", "#F472B6"];
   const pedacos = Array.from({ length: 46 }, (_, i) => {
     const x = Math.random() * 100, d = 1.6 + Math.random() * 1.4, at = Math.random() * 0.5, r = Math.random() * 360;
     return `<i style="left:${x}%;background:${cores[i % cores.length]};animation-duration:${d}s;animation-delay:${at}s;transform:rotate(${r}deg)"></i>`;
@@ -306,16 +306,16 @@ const COSTAS = [
 export function corpoSvg(pct = {}, lado = null) {
   const cor = (g, peso = 1) => {
     const p = Math.max(0, Math.min(1, (pct[g] || 0) * peso));
-    return p ? `fill="#C6F432" fill-opacity="${(0.25 + 0.75 * p).toFixed(2)}"` : `fill="#3A3F47"`;
+    return p ? `fill="#2563EB" fill-opacity="${(0.25 + 0.75 * p).toFixed(2)}"` : `fill="#C9D3E1"`;
   };
   const contorno = suave(CONTORNO);
   const figura = (x0, musc, rotulo) => {
     const metade = musc.map(([g, pts, peso]) => `<path d="${suave(pts)}" ${cor(g, peso)}><title>${g}</title></path>`).join("");
     return `<g transform="translate(${x0},0)">
-      <path d="${contorno}" fill="#24272C"/><path d="${contorno}" fill="#24272C" transform="translate(160,0) scale(-1,1)"/>
-      <ellipse cx="80" cy="29" rx="16" ry="20" fill="#24272C"/>
-      <g stroke="#0E0F11" stroke-width="1.6" stroke-linejoin="round">${metade}<g transform="translate(160,0) scale(-1,1)">${metade}</g></g>
-      ${rotulo ? `<text x="80" y="368" text-anchor="middle" font-size="13" font-family="Inter, Arial, sans-serif" fill="#9AA0A8">${rotulo}</text>` : ""}</g>`;
+      <path d="${contorno}" fill="#E3E9F2"/><path d="${contorno}" fill="#E3E9F2" transform="translate(160,0) scale(-1,1)"/>
+      <ellipse cx="80" cy="29" rx="16" ry="20" fill="#E3E9F2"/>
+      <g stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round">${metade}<g transform="translate(160,0) scale(-1,1)">${metade}</g></g>
+      ${rotulo ? `<text x="80" y="368" text-anchor="middle" font-size="13" font-family="Inter, Arial, sans-serif" fill="#64748B">${rotulo}</text>` : ""}</g>`;
   };
   if (lado) return `<svg viewBox="0 0 160 352" aria-hidden="true">${figura(0, lado === "costas" ? COSTAS : FRENTE, "")}</svg>`;
   return `<svg class="corpo" viewBox="0 0 340 374" role="img" aria-label="Músculos treinados na semana">${figura(4, FRENTE, "Frente")}${figura(176, COSTAS, "Costas")}</svg>`;
@@ -330,10 +330,10 @@ export function barrasSemana(atual, passada, rotulos) {
   const cols = rotulos.map((t, i) => {
     const x0 = i * larg + larg * 0.18, w = larg * 0.3;
     return barra(passada[i], x0, w, "b-ant") + barra(atual[i], x0 + w + 2, w, "b-at")
-      + `<text x="${i * larg + larg / 2}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#9AA0A8">${t}</text>`;
+      + `<text x="${i * larg + larg / 2}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#64748B">${t}</text>`;
   }).join("");
   return `<svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Volume por dia, esta semana e a anterior">
-    <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#2A2E34"/>${cols}</svg>`;
+    <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#E1E7F0"/>${cols}</svg>`;
 }
 
 // ---------- folha que sobe de baixo (lista, foto, explicação) ----------
