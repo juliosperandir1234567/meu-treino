@@ -522,72 +522,179 @@ let ultimaImagem = null;
 export async function telaPublicar(id) {
   const r = await resumoSessao(id);
   const foto = r.s.foto_path ? await fotoUrl(r.s.foto_path) : null;
+  const comFoto = formato !== "numeros";
   render(`<section class="tela">
     <div class="topo">${botaoVoltar(`#/fim/${id}`)}<div class="tit"><h2>Publicar treino</h2></div></div>
-    <canvas id="cv" class="prev" aria-label="Prévia da imagem para publicar"></canvas>
+    <canvas id="cv" class="prev${comFoto ? " toque" : ""}" ${comFoto ? `data-acao="fotoPublicar" data-id="${id}" role="button"` : ""} aria-label="Prévia da imagem para publicar${comFoto ? ". Toque para escolher a foto" : ""}"></canvas>
     <div class="abas">${[["story", "Story"], ["post", "Post"], ["numeros", "Só números"]].map(([k, t]) => `<button class="${formato === k ? "at" : ""}" data-acao="formato" data-f="${k}" data-id="${id}">${t}</button>`).join("")}</div>
-    ${!foto && formato !== "numeros" ? `<a class="btn" href="#/fim/${id}">${ico("camera", 18)} Adicionar foto do treino</a>` : ""}
+    ${comFoto ? `<button class="btn" data-acao="fotoPublicar" data-id="${id}">${ico("camera", 18)} ${foto ? "Trocar foto" : "Escolher foto do treino"}</button>` : ""}
   </section>
   <div class="rodape"><div><button class="btn" data-acao="salvarImg">Salvar imagem</button><button class="btn pri" data-acao="compartilhar">${ico("share", 18)} Compartilhar</button></div></div>`);
   await desenharCard(r, foto);
 }
 acoes.formato = (el) => { formato = el.dataset.f; telaPublicar(el.dataset.id); };
+acoes.fotoPublicar = async (el) => {
+  const file = await escolherFoto();
+  if (!file) return;
+  toast("Enviando foto…");
+  const path = await enviarFoto(await reduzir(file, 1600, 0.85), "treinos");
+  q(await sb.from("sessoes").update({ foto_path: path }).eq("id", el.dataset.id));
+  toast("Foto salva"); telaPublicar(el.dataset.id);
+};
 
-async function desenharCard({ s, ser, volume, recordes }, foto) {
+// ícones (traço, grade 24×24) desenhados no canvas
+const ICONES = {
+  halter: ["M6.5 6h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z", "M3.5 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z",
+    "M16.5 6h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z", "M19.5 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z",
+    "M8.5 12h7", "M1 12h1.5", "M21.5 12H23"],
+  cronometro: ["M10 2h4", "M12 14l3-3", "M20 14a8 8 0 1 1-16 0a8 8 0 1 1 16 0", "M19 5l1.5 1.5"],
+  relogio: ["M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0", "M12 6.5V12l3.5 2"],
+  trofeu: ["M6 9H4.5a2.5 2.5 0 0 1 0-5H6", "M18 9h1.5a2.5 2.5 0 0 0 0-5H18", "M4 22h16", "M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22", "M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22", "M18 2H6v7a6 6 0 0 0 12 0V2Z"],
+  camera: ["M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z", "M15 13a3 3 0 1 1-6 0a3 3 0 1 1 6 0"],
+};
+function icone(c, nome, x, y, tam, cor, larg = 1.8) {
+  c.save(); c.translate(x, y); c.scale(tam / 24, tam / 24);
+  c.strokeStyle = cor; c.lineWidth = larg; c.lineCap = "round"; c.lineJoin = "round";
+  ICONES[nome].forEach((d) => c.stroke(new Path2D(d)));
+  c.restore();
+}
+// escreve e diminui a fonte até caber na largura
+function caber(c, txt, max, peso, tam, fam) {
+  let t = tam;
+  do { c.font = `${peso} ${t}px ${fam}`; t -= 2; } while (c.measureText(txt).width > max && t > 18);
+}
+
+const AZUL = "#3B82F6", CIANO = "#22D3EE", TXT = "#F2F5FA", MUDO = "#9AA6BC";
+const SANS = "Inter, sans-serif", TIT = "'Space Grotesk', Inter, sans-serif";
+
+async function desenharCard(r, foto) {
   const cv = document.getElementById("cv"); if (!cv) return;
   const W = 1080, H = formato === "story" ? 1920 : formato === "post" ? 1350 : 1080;
   cv.width = W; cv.height = H;
-  const c = cv.getContext("2d");
   try { await document.fonts.ready; } catch { /* */ }
-  c.fillStyle = "#111A2E"; c.fillRect(0, 0, W, H);
-  if (foto && formato !== "numeros") {
-    try {
-      const img = await carregarImagem(foto);
-      const esc = Math.max(W / img.width, H / img.height);
-      const w = img.width * esc, hh = img.height * esc;
-      c.drawImage(img, (W - w) / 2, (H - hh) / 2, w, hh);
-    } catch { /* foto indisponível */ }
-    const g = c.createLinearGradient(0, H * 0.45, 0, H);
-    g.addColorStop(0, "rgba(11,18,32,0)"); g.addColorStop(0.5, "rgba(11,18,32,.85)"); g.addColorStop(1, "rgba(11,18,32,.95)");
-    c.fillStyle = g; c.fillRect(0, 0, W, H);
-    const g2 = c.createLinearGradient(0, 0, 0, 260); g2.addColorStop(0, "rgba(11,18,32,.6)"); g2.addColorStop(1, "rgba(11,18,32,0)");
-    c.fillStyle = g2; c.fillRect(0, 0, W, 260);
-  } else {
-    c.fillStyle = "#0B1220"; c.fillRect(0, 0, W, H);
-    c.strokeStyle = "#3B82F6"; c.lineWidth = 6; c.globalAlpha = .15;
-    for (let i = -H; i < W; i += 90) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i + H, H); c.stroke(); }
-    c.globalAlpha = 1;
-  }
-  const M = 72;
-  c.fillStyle = "#F2F3F5"; c.font = "700 46px 'Space Grotesk', sans-serif"; c.textBaseline = "top";
-  c.fillText("Meu Treino", M, M);
-  const letra = (s.ficha_nome.match(/Treino\s+(\S+)/) || [])[1] || "";
+  let img = null;
+  if (foto && formato !== "numeros") { try { img = await carregarImagem(foto); } catch { /* foto indisponível */ } }
+  pintar(cv.getContext("2d"), W, H, r, img, true);
+  // a imagem que vai para o compartilhamento não leva o "toque para adicionar"
+  if (!img && formato !== "numeros") {
+    const off = document.createElement("canvas"); off.width = W; off.height = H;
+    pintar(off.getContext("2d"), W, H, r, null, false);
+    ultimaImagem = await new Promise((ok) => off.toBlob(ok, "image/jpeg", 0.92));
+  } else ultimaImagem = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.92));
+}
+
+function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
+  const M = 56;
+  // fundo azul-escuro com brilhos
+  const fundo = c.createLinearGradient(0, 0, 0, H);
+  fundo.addColorStop(0, "#071230"); fundo.addColorStop(0.55, "#06102A"); fundo.addColorStop(1, "#040A1C");
+  c.fillStyle = fundo; c.fillRect(0, 0, W, H);
+  const brilho = (x, y, raio, cor) => { const g = c.createRadialGradient(x, y, 0, x, y, raio); g.addColorStop(0, cor); g.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = g; c.fillRect(0, 0, W, H); };
+  brilho(0, 0, 520, "rgba(37,99,235,.45)");
+  brilho(W, H * 0.55, 620, "rgba(37,99,235,.22)");
+  brilho(W * 0.3, H, 700, "rgba(14,116,144,.18)");
+  c.textBaseline = "alphabetic"; c.textAlign = "left";
+
+  // topo: marca e etiqueta do treino
+  icone(c, "halter", M + 8, 52, 72, CIANO, 1.9);
+  c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(M + 104, 62, 3, 52);
+  c.fillStyle = TXT; c.font = `700 46px ${TIT}`; c.fillText("Meu Treino", M + 134, 104);
+  const nome = s.ficha_nome || "Treino";
+  const letra = (nome.match(/Treino\s+(\S+)/) || [])[1] || "";
   if (letra) {
-    c.font = "700 36px Inter, sans-serif";
-    const txt = `Treino ${letra}`, tw = c.measureText(txt).width + 48;
-    c.fillStyle = "#3B82F6"; roundRect(c, W - M - tw, M - 6, tw, 64, 32); c.fill();
-    c.fillStyle = "#FFFFFF"; c.fillText(txt, W - M - tw + 24, M + 8);
+    c.font = `700 38px ${SANS}`;
+    const txt = `Treino ${letra}`, tw = c.measureText(txt).width + 72;
+    const g = c.createLinearGradient(W - M - tw, 0, W - M, 0); g.addColorStop(0, "#2563EB"); g.addColorStop(1, AZUL);
+    c.save(); c.shadowColor = "rgba(59,130,246,.55)"; c.shadowBlur = 30;
+    c.fillStyle = g; roundRect(c, W - M - tw, 54, tw, 70, 35); c.fill(); c.restore();
+    c.strokeStyle = "rgba(147,197,253,.5)"; c.lineWidth = 2; roundRect(c, W - M - tw, 54, tw, 70, 35); c.stroke();
+    c.fillStyle = "#fff"; c.fillText(txt, W - M - tw + 36, 103);
   }
-  const titulo = s.ficha_nome.replace(/^Treino\s+\S+\s*·?\s*/, "") || s.ficha_nome;
-  const base = H - M;
-  let y = base - (recordes.length ? 70 : 0);
+  const titulo = nome.replace(/^Treino\s+\S+\s*·?\s*/, "") || nome;
+
+  // de baixo para cima: recorde, números, título, data
+  let y = H - M;
   if (recordes.length) {
-    c.fillStyle = "#3B82F6"; c.font = "600 38px Inter, sans-serif"; c.textBaseline = "bottom";
-    const r = recordes[0];
-    c.fillText(`Recorde: ${r.nome} ${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`.slice(0, 48), M, base);
+    const r = recordes[0], ch = 150, top = y - ch;
+    c.save(); c.shadowColor = "rgba(34,211,238,.35)"; c.shadowBlur = 36;
+    c.fillStyle = "rgba(12,30,66,.75)"; roundRect(c, M, top, W - 2 * M, ch, 26); c.fill(); c.restore();
+    const borda = c.createLinearGradient(M, 0, W - M, 0); borda.addColorStop(0, CIANO); borda.addColorStop(1, AZUL);
+    c.strokeStyle = borda; c.lineWidth = 3; roundRect(c, M, top, W - 2 * M, ch, 26); c.stroke();
+    icone(c, "trofeu", M + 50, top + 43, 66, CIANO, 1.8);
+    c.fillStyle = "rgba(255,255,255,.3)"; c.fillRect(M + 154, top + 38, 2, ch - 76);
+    c.fillStyle = "#C9D3E6"; c.font = `700 28px ${SANS}`;
+    if ("letterSpacing" in c) c.letterSpacing = "5px";
+    c.fillText(recordes.length > 1 ? `RECORDE PESSOAL  +${recordes.length - 1}` : "RECORDE PESSOAL", M + 190, top + 58);
+    if ("letterSpacing" in c) c.letterSpacing = "0px";
+    const val = `${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`;
+    c.font = `700 50px ${SANS}`; const vw = c.measureText(val).width;
+    const maxNome = W - 2 * M - 190 - 40 - vw - 28;
+    caber(c, r.nome, maxNome, 700, 50, SANS);
+    c.fillStyle = TXT; c.fillText(r.nome, M + 190, top + 118);
+    const nw = c.measureText(r.nome).width;
+    c.font = `700 50px ${SANS}`; c.fillStyle = CIANO; c.fillText(val, M + 190 + nw + 28, top + 118);
+    y = top - 48;
   }
-  const cols = [["Duração", s.fim ? duracao(s.inicio, s.fim) : "—"], ["Volume", volumeTxt(volume)], ["Horário", `${hora(s.inicio)}–${hora(s.fim)}`]];
-  const cw = (W - 2 * M) / 3;
-  cols.forEach(([rot, v], i) => {
-    c.textBaseline = "bottom";
-    c.fillStyle = "#F2F3F5"; c.font = "700 54px Inter, sans-serif"; c.fillText(v, M + i * cw, y - 10);
-    c.fillStyle = "#B8BDC4"; c.font = "500 30px Inter, sans-serif"; c.fillText(rot, M + i * cw, y - 76);
+  // três cartões de números
+  const sh = 146, stop = y - sh, gap = 18, livre = W - 2 * M - 2 * gap;
+  const larg = [0.31, 0.29, 0.40].map((p) => p * livre);
+  const dados = [["cronometro", "Duração", s.fim ? duracao(s.inicio, s.fim) : "—"], ["halter", "Volume", volumeTxt(volume)], ["relogio", "Horário", `${hora(s.inicio)}–${hora(s.fim)}`]];
+  let x = M;
+  dados.forEach(([ic, rot, v], i) => {
+    const w = larg[i];
+    c.fillStyle = "rgba(15,30,62,.55)"; roundRect(c, x, stop, w, sh, 22); c.fill();
+    c.strokeStyle = "rgba(96,165,250,.28)"; c.lineWidth = 2; roundRect(c, x, stop, w, sh, 22); c.stroke();
+    icone(c, ic, x + 28, stop + (sh - 60) / 2, 60, CIANO, 1.7);
+    c.fillStyle = "#C9D3E6"; c.font = `500 28px ${SANS}`; c.fillText(rot, x + 108, stop + 52);
+    caber(c, v, w - 108 - 18, 700, 50, SANS); c.fillStyle = TXT; c.fillText(v, x + 106, stop + 112);
+    x += w + gap;
   });
-  c.fillStyle = "#F2F3F5"; c.font = "700 84px 'Space Grotesk', sans-serif";
-  c.fillText(titulo.slice(0, 22), M, y - 140);
-  c.fillStyle = "#B8BDC4"; c.font = "500 34px Inter, sans-serif";
-  c.fillText(`${new Date(s.inicio).toLocaleDateString("pt-BR")} · ${ser.length} séries`, M, y - 240);
-  ultimaImagem = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.92));
+  y = stop - 44;
+  caber(c, titulo, W - 2 * M, 700, 92, TIT);
+  c.fillStyle = TXT; c.fillText(titulo, M + 6, y);
+  y -= 112;
+  c.font = `500 36px ${SANS}`; c.fillStyle = "#C9D3E6";
+  const dt = new Date(s.inicio).toLocaleDateString("pt-BR"), dw = c.measureText(dt).width;
+  c.fillText(dt, M + 8, y);
+  c.fillStyle = CIANO; c.beginPath(); c.arc(M + 8 + dw + 26, y - 12, 6, 0, Math.PI * 2); c.fill();
+  c.fillStyle = "#C9D3E6"; c.fillText(`${ser.length} séries`, M + 8 + dw + 52, y);
+
+  // faixa de luz entre a foto e os dados
+  const yLuz = y - 90;
+  const luz = c.createLinearGradient(0, 0, W, 0);
+  luz.addColorStop(0, "rgba(59,130,246,0)"); luz.addColorStop(0.5, "rgba(59,130,246,.18)"); luz.addColorStop(1, "rgba(96,165,250,.7)");
+  c.strokeStyle = luz; c.lineWidth = 2; c.beginPath(); c.moveTo(0, yLuz + 30); c.quadraticCurveTo(W * 0.6, yLuz + 10, W, yLuz - 40); c.stroke();
+
+  // área da foto
+  const fx = M, fy = 170, fw = W - 2 * M, fh = yLuz - 30 - fy;
+  if (formato === "numeros") {
+    // sem foto: halter grande e discreto no espaço livre
+    if (fh > 160) { const t = Math.min(fh * 0.9, 260); c.globalAlpha = 0.18; icone(c, "halter", W / 2 - t / 2, fy + (fh - t) / 2, t, CIANO, 1.2); c.globalAlpha = 1; }
+    return;
+  }
+  if (fh < 200) return;
+  if (img) {
+    c.save(); roundRect(c, fx, fy, fw, fh, 36); c.clip();
+    const esc = Math.max(fw / img.width, fh / img.height), w = img.width * esc, hh = img.height * esc;
+    c.drawImage(img, fx + (fw - w) / 2, fy + (fh - hh) / 2, w, hh);
+    c.restore();
+    c.strokeStyle = "rgba(96,165,250,.35)"; c.lineWidth = 2; roundRect(c, fx, fy, fw, fh, 36); c.stroke();
+  } else {
+    c.fillStyle = "rgba(15,30,62,.35)"; roundRect(c, fx, fy, fw, fh, 36); c.fill();
+    c.save(); if (previa) c.setLineDash([10, 9]); c.strokeStyle = "rgba(148,163,184,.55)"; c.lineWidth = 2.5; roundRect(c, fx, fy, fw, fh, 36); c.stroke(); c.restore();
+    const cy = fy + fh / 2;
+    c.textAlign = "center";
+    if (previa) {
+      icone(c, "camera", W / 2 - 60, cy - 160, 120, "#DCE6F5", 1.4);
+      c.fillStyle = CIANO; c.beginPath(); c.arc(W / 2, cy - 160 + 65, 18, 0, Math.PI * 2); c.lineWidth = 6; c.strokeStyle = CIANO; c.stroke();
+      c.fillStyle = TXT; c.font = `700 58px ${TIT}`; c.fillText("Sua foto do treino", W / 2, cy + 32);
+      c.fillStyle = MUDO; c.font = `500 36px ${SANS}`; c.fillText("Toque para adicionar", W / 2, cy + 92);
+    } else {
+      icone(c, "halter", W / 2 - 80, cy - 140, 160, "rgba(34,211,238,.55)", 1.4);
+      c.fillStyle = TXT; c.font = `700 58px ${TIT}`; c.fillText("Treino concluído", W / 2, cy + 80);
+    }
+    c.textAlign = "left";
+  }
 }
 export function definirImagem(b) { ultimaImagem = b; }
 export function roundRect(c, x, y, w, hh, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + hh, r); c.arcTo(x + w, y + hh, x, y + hh, r); c.arcTo(x, y + hh, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
