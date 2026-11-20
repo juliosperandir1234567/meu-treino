@@ -106,16 +106,16 @@ export function tabelaComparativa(avs, { dif = true } = {}) {
   const extras = EXTRAS.filter(([c]) => !linhas.some((k) => campoDe(k) === c) && avs.some((a) => a[c] != null));
   const valor = (a, k) => a.medidas?.[k] ?? a[extras.find(([, r]) => r === k)?.[0]] ?? null;
   const todas = [...extras.map(([, r]) => r), ...linhas];
-  const cab = (a) => h(a.rotulo || new Date(a.data + "T12:00").toLocaleDateString("pt-BR"));
-  return `<div class="tabela-rolar"><table class="tabela comp-av"><thead><tr><th>Medida</th>${avs.map((a) => `<th>${cab(a)}</th>`).join("")}${dif && avs.length > 1 ? "<th>Dif.</th>" : ""}</tr></thead><tbody>
+  const cab = (a) => h(a.rotulo || new Date(a.data + "T12:00").toLocaleDateString("pt-BR")).split("/").join("/<wbr>");
+  return `<div class="tabela-rolar"><table class="tabela comp-av"><thead><tr><th>Medida</th>${avs.map((a) => `<th>${cab(a)}</th>`).join("")}${dif && avs.length > 1 ? '<th class="cdif">Dif.</th>' : ""}</tr></thead><tbody>
     ${todas.map((k) => {
       const vs = avs.map((a) => valor(a, k));
       let d = "";
       if (dif && avs.length > 1) {
         const ult = vs[vs.length - 1], ant = [...vs.slice(0, -1)].reverse().find((x) => x != null);
-        if (ult == null || ant == null) d = '<td class="mudo">—</td>';
+        if (ult == null || ant == null) d = '<td class="cdif mudo">—</td>';
         else { const x = Math.round((ult - ant) * 100) / 100; const cor = !x || neutro(k) ? "mudo" : (x < 0) === bomDescer(k) ? "ac" : "lar";
-          d = `<td class="${cor}" style="font-weight:600">${x > 0 ? "+" : x < 0 ? "−" : ""}${x ? numBR(Math.abs(x)) : "igual"}</td>`; }
+          d = `<td class="cdif ${cor}" style="font-weight:600">${x > 0 ? "+" : x < 0 ? "−" : ""}${x ? numBR(Math.abs(x)) : "igual"}</td>`; }
       }
       return `<tr><td>${h(k)}</td>${vs.map((v, i) => `<td class="${i === vs.length - 1 ? "" : "mudo"}">${i === vs.length - 1 && v != null ? `<b>${numBR(v)}</b>` : numBR(v)}</td>`).join("")}${d}</tr>`;
     }).join("")}

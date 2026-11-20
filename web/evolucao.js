@@ -100,8 +100,8 @@ export async function telaAvaliacao() {
     const bomSubir = (k) => !/cintura|abdomen|quadril/.test(normal(k));
     corpo = `
       <div class="grade2">${comp("Peso", "peso", " kg", false)}${comp("Gordura", "gordura", " %", false)}${comp("Massa magra", "massa_magra", " kg", true)}${comp("IMC", "imc", "", false)}</div>
-      ${chaves.length || avs.length > 1 ? `<div class="cartao"><div class="entre"><b>Comparativo</b><span class="mini mudo">${avs.length} avaliaç${avs.length > 1 ? "ões" : "ão"}</span></div>
-        ${tabelaComparativa([...avs].reverse().slice(-6))}</div>` : ""}
+      ${chaves.length || avs.length > 1 ? `<div class="cartao"><div class="entre"><b>Comparativo</b><span class="mini mudo">${avs.length > 3 ? "3 mais recentes" : avs.length + " avaliaç" + (avs.length > 1 ? "ões" : "ão")}</span></div>
+        ${tabelaComparativa([...avs].reverse().slice(-3))}</div>` : ""}
       ${dias != null ? `<div class="cartao tracejado"><div class="linha"><span class="ac">${ico("calendario", 22)}</span><div class="col" style="gap:2px">
         <b>${dias > 0 ? `Próxima avaliação em ${dias} dia${dias > 1 ? "s" : ""}` : dias === 0 ? "Avaliação é hoje" : "Avaliação atrasada"}</b><span class="mini mudo">${new Date(prox + "T12:00").toLocaleDateString("pt-BR")}</span></div></div></div>` : ""}
       <div class="col"><span class="rot">Histórico</span>${avs.map((a) => `<div class="item"><span class="col" style="flex:1;gap:2px"><b>${a.rotulo ? h(a.rotulo) + " · " : ""}${new Date(a.data + "T12:00").toLocaleDateString("pt-BR")}</b>
