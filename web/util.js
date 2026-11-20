@@ -185,7 +185,7 @@ export function botaoVoltar(hash) {
   return `<a class="ico" href="${hash}" aria-label="Voltar">${ico("voltar")}</a>`;
 }
 export function nav(atual) {
-  const it = [["#/hoje", "casa", "Hoje"], ["#/evolucao", "sobe", "Evolução"], ["#/semana", "fogo", "Semana"], ["#/avaliacao", "regua", "Avaliação"], ["#/perfil", "pessoa", "Perfil"]];
+  const it = [["#/perfil", "pessoa", "Perfil"], ["#/hoje", "casa", "Hoje"], ["#/evolucao", "sobe", "Evolução"], ["#/semana", "fogo", "Semana"], ["#/avaliacao", "regua", "Avaliação"]];
   if (atual === "#/clientes") atual = "#/perfil";
   return `<nav class="nav"><div style="grid-template-columns:repeat(${it.length},minmax(0,1fr))">${it.map(([href, i, t]) => `<a href="${href}" class="${atual === href ? "at" : ""}">${ico(i, 22)}${t}</a>`).join("")}</div></nav>`;
 }

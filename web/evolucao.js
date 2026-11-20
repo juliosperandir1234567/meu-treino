@@ -76,7 +76,7 @@ export async function telaEvolucao(aba, exNome) {
     }
   }
   render(`<section class="tela">
-    <div class="col" style="gap:4px"><h1>Evolução</h1><span class="peq mudo">Braço e ombro subindo, cintura descendo</span></div>
+    <div class="col" style="gap:4px"><h1>Evolução</h1><span class="peq mudo">Meta: braço e ombro subindo, cintura descendo</span></div>
     <div class="abas">${[["medidas", "Medidas"], ["cargas", "Cargas"], ["peso", "Peso"]].map(([k, t]) => `<button class="${aba === k ? "at" : ""}" data-acao="abaEvo" data-a="${k}">${t}</button>`).join("")}</div>
     ${corpo}
     <a class="btn" href="#/avaliacao">${ico("pessoa", 18)} Avaliação física completa</a>
