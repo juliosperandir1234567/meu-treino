@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
   // 2) pede ao Gemini
   const key = (Deno.env.get("GEMINI_API_KEY") ?? "").trim();
   if (!key) return json({ erro: "Falta configurar o segredo GEMINI_API_KEY no Supabase." }, 500);
-  const model = (Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash").trim();
+  const model = (Deno.env.get("GEMINI_MODEL_SIMPLES") || await modeloLite(key) || Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash").trim();
   const pedir = (pensar: boolean) => gfetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -77,12 +77,30 @@ Deno.serve(async (req) => {
   return json({ ok: true, resultado: res });
 });
 
-// Gemini sobrecarregado (429/500/503) costuma passar em segundos: tenta mais duas vezes antes de desistir.
+// Gemini sobrecarregado (500/503) costuma passar em segundos: tenta mais duas vezes antes de desistir.
+// (429 = cota acabou; esperar não adianta, quem chama troca de modelo)
 function gfetch(url: string, op: RequestInit) { return comRetentativa(() => fetch(url, op)); }
+// Modelo "lite" mais novo da chave: tem cota grátis própria, separada do Flash.
+let liteCache: string | null | undefined;
+async function modeloLite(key: string): Promise<string | null> {
+  if (liteCache !== undefined) return liteCache;
+  try {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
+    const j = r.ok ? await r.json() : {};
+    const nomes: string[] = (j.models ?? [])
+      .filter((m: { supportedGenerationMethods?: string[] }) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m: { name: string }) => m.name.replace(/^models\//, ""))
+      .filter((n: string) => /^gemini-\d+(\.\d+)?-flash-lite$/.test(n));
+    const ver = (n: string) => Number(n.match(/^gemini-(\d+(?:\.\d+)?)/)![1]);
+    nomes.sort((a, b) => ver(b) - ver(a));
+    liteCache = nomes[0] ?? null;
+  } catch { liteCache = null; }
+  return liteCache;
+}
 async function comRetentativa(f: () => Promise<Response>) {
   let r = await f();
   for (const espera of [1500, 4000]) {
-    if (![429, 500, 503].includes(r.status)) break;
+    if (![500, 503].includes(r.status)) break;
     await r.body?.cancel();
     console.warn(`Gemini ${r.status}: tentando de novo em ${espera} ms`);
     await new Promise((ok) => setTimeout(ok, espera));

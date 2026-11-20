@@ -4,7 +4,7 @@ import {
   reduzir, blobBase64, enviarFoto, carregarImagem,
 } from "./util.js";
 
-let P = { tipo: "treino", imgs: [], lendo: false, res: null, destino: null, novaLetra: "", novaNome: "", marc: {}, fichas: [] };
+let P = { tipo: "treino", qual: "", imgs: [], lendo: false, res: null, destino: null, novaLetra: "", novaNome: "", marc: {}, fichas: [] };
 
 export async function telaPrint(tipo) {
   if (P.tipo !== tipo) P = { ...P, tipo, res: null };
@@ -21,15 +21,18 @@ function desenharEscolha() {
     <div class="cartao">
       <b>${P.tipo === "treino" ? "Mande o print da ficha" : "Mande o print da avaliação"}</b>
       <span class="peq mudo">${P.tipo === "treino"
-        ? "Dica: abra os exercícios (a setinha ⌄) antes do print para eu pegar séries, repetições e carga. Pode mandar até 6 prints."
+        ? "Pode ser print do app da academia ou foto da ficha de papel (impressa ou à mão). No app, abra os exercícios (a setinha ⌄) antes do print. Até 6 imagens."
         : "Mande os prints com peso, % de gordura e as medidas. Pode mandar até 6."}</span>
       ${P.imgs.length ? `<div class="prints">${P.imgs.map((im, i) => `<button data-acao="tirarPrint" data-i="${i}" aria-label="Remover print ${i + 1}" style="padding:0;border:0;background:none"><img src="${im.url}" alt="Print ${i + 1}"></button>`).join("")}</div>
         <span class="mini mudo">Toque num print para remover.</span>` : ""}
+      ${P.tipo === "treino" ? `<label class="campo">Qual treino da ficha? <span class="mini mudo">(opcional, se tiver A, B, C na mesma folha)</span>
+        <input class="inp" data-muda="qualTreino" value="${h(P.qual)}" placeholder="Ex.: B" maxlength="20"></label>` : ""}
       <button class="btn blk" data-acao="addPrint">${ico("imagem", 18)} ${P.imgs.length ? "Adicionar mais prints" : "Escolher prints"}</button>
     </div>
   </section>
   <div class="rodape"><div><button class="btn pri" data-acao="lerPrint" ${P.imgs.length && !P.lendo ? "" : "disabled"}>${P.lendo ? '<span class="girando"></span> Lendo o print…' : "Ler print"}</button></div></div>`);
 }
+mudancas.qualTreino = (el) => { P.qual = el.value.trim(); };
 acoes.tipoPrint = (el) => { ir(`#/print?tipo=${el.dataset.t}`); };
 acoes.addPrint = async () => {
   const inp = document.getElementById("arquivo");
@@ -46,7 +49,7 @@ acoes.lerPrint = async () => {
   P.lendo = true; desenharEscolha();
   try {
     for (const im of P.imgs) if (!im.dados) { im.blob = await reduzir(im.file, 1600, 0.85); im.dados = await blobBase64(im.blob); }
-    const { data, error } = await sb.functions.invoke("ler-print", { body: { tipo: P.tipo, imagens: P.imgs.map((im) => ({ mime: "image/jpeg", dados: im.dados })) } });
+    const { data, error } = await sb.functions.invoke("ler-print", { body: { tipo: P.tipo, qual: P.tipo === "treino" ? P.qual : "", imagens: P.imgs.map((im) => ({ mime: "image/jpeg", dados: im.dados })) } });
     if (error) {
       let msg = error.message;
       try { const j = await error.context.json(); msg = j.erro || msg; } catch { /* */ }
