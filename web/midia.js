@@ -4,10 +4,11 @@
 import { sb, h, normal, grupoDe, corpoSvg, ico } from "./util.js";
 
 const BASE = "https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/";
-const CHAVE = "midia-v1";
+const CHAVE = "midia-v2";   // v2: a v1 guardou "sem imagem" para muitos nomes que agora têm foto
 let cache = {};
-try { cache = JSON.parse(localStorage.getItem(CHAVE) || "{}"); } catch { cache = {}; }
-const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify(cache)); } catch { /* sem espaço */ } };
+try { localStorage.removeItem("midia-v1"); cache = JSON.parse(localStorage.getItem(CHAVE) || "{}"); } catch { cache = {}; }
+// só guarda no aparelho quem tem foto; "sem foto" vale só nesta abertura do app (pode ganhar foto depois)
+const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify(Object.fromEntries(Object.entries(cache).filter(([, v]) => v?.ref)))); } catch { /* sem espaço */ } };
 const pendentes = new Map();   // chave → promessa, para não pedir o mesmo nome duas vezes
 
 // músculos do catálogo (inglês) → grupos do app
