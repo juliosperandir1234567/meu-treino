@@ -3,7 +3,7 @@ import {
   sb, acoes, mudancas, render, ir, h, toast, q, num, kg, normal, ico, botaoVoltar,
   reduzir, blobBase64, enviarFoto, carregarImagem,
 } from "./util.js";
-import { lerTexto } from "./texto.js";
+import { lerTexto, lerAvaliacaoTexto } from "./texto.js";
 
 let P = { tipo: "texto", texto: "", qual: "", imgs: [], lendo: false, res: null, destino: null, novaLetra: "", novaNome: "", marc: {}, fichas: [] };
 
@@ -33,6 +33,12 @@ Rosca direta 3x10 descanso 60s</pre>
     </div>
   </section>
   <div class="rodape"><div><button class="btn pri" data-acao="lerTextoFicha">Ler texto</button></div></div>` : `
+    ${P.tipo === "avaliacao" ? `<div class="cartao">
+      <b>Cole o texto da avaliação</b>
+      <span class="peq mudo">Peso, IMC, % de gordura e as medidas (uma por linha, ex.: Cintura 88). Valores zerados são ignorados.</span>
+      <textarea id="txtAv" class="inp txt-ficha" rows="8" placeholder="Cole aqui o texto da avaliação…">${h(P.textoAv || "")}</textarea>
+      <button class="btn pri blk" data-acao="lerTextoAv">Ler texto</button></div>
+    <span class="mini mudo" style="text-align:center">ou mande o print</span>` : ""}
     <div class="cartao">
       <b>${P.tipo === "treino" ? "Mande o print da ficha" : "Mande o print da avaliação"}</b>
       <span class="peq mudo">${P.tipo === "treino"
@@ -48,6 +54,13 @@ Rosca direta 3x10 descanso 60s</pre>
   <div class="rodape"><div><button class="btn pri" data-acao="lerPrint" ${P.imgs.length && !P.lendo ? "" : "disabled"}>${P.lendo ? '<span class="girando"></span> Lendo o print…' : "Ler print"}</button></div></div>`}`);
 }
 mudancas.qualTreino = (el) => { P.qual = el.value.trim(); };
+acoes.lerTextoAv = () => {
+  P.textoAv = document.getElementById("txtAv")?.value || "";
+  if (!P.textoAv.trim()) return toast("Cole o texto da avaliação primeiro");
+  const r = lerAvaliacaoTexto(P.textoAv);
+  if (r.peso == null && r.gordura == null && !Object.keys(r.medidas).length) return toast("Não achei peso, gordura nem medidas nesse texto", 4500);
+  P.res = r; desenharAvaliacao();
+};
 acoes.lerTextoFicha = async () => {
   P.texto = document.getElementById("txtFicha")?.value || "";
   if (!P.texto.trim()) return toast("Cole o texto do treino primeiro");
@@ -293,13 +306,13 @@ function desenharAvaliacao() {
   const r = P.res || {};
   render(`<section class="tela">
     <div class="topo"><button class="ico" data-acao="voltarPrint" aria-label="Voltar">${ico("voltar")}</button><div class="tit"><h2>Conferir avaliação</h2>
-      <span class="mini mudo">Confira os números lidos do print antes de salvar</span></div></div>
-    ${formAvaliacao({ ...r, medidas: r.medidas || {} }, "salvarAvPrint", "Lido do print")}
+      <span class="mini mudo">Confira os números antes de salvar</span></div></div>
+    ${formAvaliacao({ ...r, medidas: r.medidas || {} }, "salvarAvPrint", "Dados lidos")}
   </section>`);
 }
 acoes.salvarAvPrint = async (form) => {
   const d = lerFormAvaliacao(form);
   q(await sb.from("avaliacoes").insert({ ...d, origem: "print" }));
-  P = { ...P, imgs: [], res: null };
+  P = { ...P, imgs: [], res: null, textoAv: "" };
   toast("Avaliação salva"); ir("#/avaliacao");
 };

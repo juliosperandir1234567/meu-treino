@@ -85,7 +85,7 @@ export async function telaEvolucao(aba, exNome) {
 window.__medida = (v) => { medidaSel = v; telaEvolucao("medidas"); };
 acoes.abaEvo = (el) => ir(`#/evolucao?aba=${el.dataset.a}`);
 const vazioAv = () => `<div class="cartao vazio"><p style="margin:0">Nenhuma avaliação ainda.</p>
-  <a class="btn pri blk" href="#/print?tipo=avaliacao">${ico("camera", 18)} Mandar print da avaliação</a><a class="btn blk" href="#/medir">Lançar medidas à mão</a></div>`;
+  <a class="btn pri blk" href="#/print?tipo=avaliacao">${ico("lista", 18)} Colar texto ou print da avaliação</a><a class="btn blk" href="#/medir">Lançar medidas à mão</a></div>`;
 
 // ---------- AVALIAÇÃO FÍSICA ----------
 export async function telaAvaliacao() {
@@ -112,7 +112,7 @@ export async function telaAvaliacao() {
   render(`<section class="tela">
     <div class="topo"><div class="tit"><h1>Avaliação física</h1>${ult ? `<span class="mini mudo">${new Date(ult.data + "T12:00").toLocaleDateString("pt-BR")} · ${ult.origem === "print" ? "importada por print" : ult.origem === "casa" ? "medida em casa" : "lançada à mão"}</span>` : ""}</div></div>
     ${corpo}
-    ${ult ? `<div class="grade2"><a class="btn" href="#/medir">${ico("mais", 18)} Medir em casa</a><a class="btn pri" href="#/print?tipo=avaliacao">${ico("camera", 18)} Nova por print</a></div>` : ""}
+    ${ult ? `<div class="grade2"><a class="btn" href="#/medir">${ico("mais", 18)} Medir em casa</a><a class="btn pri" href="#/print?tipo=avaliacao">${ico("lista", 18)} Nova (texto ou print)</a></div>` : ""}
   </section>${nav("#/avaliacao")}`);
 }
 acoes.apagarAv = async (el) => {

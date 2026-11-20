@@ -81,3 +81,47 @@ export function lerTexto(texto, qual = "") {
   }
   return { titulo: escolhido.titulo, exercicios };
 }
+
+// ---------- avaliação física em texto ----------
+// Lê peso, IMC, % de gordura, massa magra, data e as circunferências (cm).
+// Dobras cutâneas (mm) não entram nas medidas: o % de gordura já resume elas.
+const PARTE_CORPO = /(t[óo]rax|peito|bra[çc]o|antebra[çc]o|cintura|abd[ôo]men|quadril|coxa|panturrilha|ombro|pesco[çc]o|escapular|gl[úu]teo)/i;
+const NUM_AV = String.raw`(\d+(?:[.,]\d+)?)`;
+function valorDe(texto, rotulo) {
+  const m = texto.match(new RegExp(rotulo + String.raw`[^\d\n]*?` + NUM_AV, "i"));
+  return m ? numero(m[1]) : null;
+}
+function nomeMedida(n) {
+  let s = n.replace(/\s+/g, " ").trim().replace(/[:\-–]+$/, "").trim();
+  s = s.replace(/^t[óo]rax$/i, "Peito").replace(/\s+relaxado$/i, "");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+export function lerAvaliacaoTexto(texto) {
+  const t = String(texto || "").replace(/\r/g, "");
+  const res = { data: null, peso: null, gordura: null, massa_magra: null, imc: null, medidas: {} };
+  res.peso = valorDe(t, String.raw`\bpeso(?!\s*e\s*altura)`);
+  res.imc = valorDe(t, String.raw`\bimc\b`);
+  res.gordura = valorDe(t, String.raw`(?:percentual\s+de\s+gordura|%\s*(?:de\s*)?gordura|gordura\s*(?:corporal)?\s*\(?%?\)?)`);
+  res.massa_magra = valorDe(t, String.raw`massa\s+magra`);
+  const altura = valorDe(t, String.raw`\baltura\b`);
+  if (!res.imc && res.peso && altura) { const a = altura > 3 ? altura / 100 : altura; res.imc = Math.round((res.peso / (a * a)) * 10) / 10; }
+  if (!res.massa_magra && res.peso && res.gordura) res.massa_magra = Math.round(res.peso * (1 - res.gordura / 100) * 10) / 10;
+  const d = t.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (d) res.data = `${d[3]}-${d[2]}-${d[1]}`;
+
+  let secao = "";
+  for (const bruta of t.split("\n")) {
+    const l = bruta.trim();
+    if (!l) continue;
+    if (/dobras?|skinfold/i.test(l) && !/\d/.test(l.replace(/\d+\s*dobras/i, ""))) { secao = "dobras"; continue; }
+    if (/circunfer|per[íi]metro|medidas/i.test(l) && !/\d/.test(l)) { secao = "medidas"; continue; }
+    if (/^(peso|composi|bioimped)/i.test(l) && !/\d/.test(l)) { secao = "geral"; continue; }
+    if (secao === "dobras") continue;
+    const m = l.match(new RegExp(String.raw`^([^\d]+?)[\s:|\t]+` + NUM_AV));
+    if (!m || !PARTE_CORPO.test(m[1])) continue;
+    const v = numero(m[2]);
+    if (!v) continue;   // valor zerado = não medido
+    res.medidas[nomeMedida(m[1])] = v;
+  }
+  return res;
+}
