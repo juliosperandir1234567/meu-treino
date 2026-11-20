@@ -3,13 +3,16 @@ import {
   sb, configOk, sessao, acoes, limpeza, mudancas, render, renderSemRolar, corpoSvg, mostrarGuardada, esquecerTelas, ir, h, toast, erro, q, num, fmt, kg,
   dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe,
 } from "./util.js";
-import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino } from "./treino.js";
+import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino, guardarParaSemInternet } from "./treino.js";
+import { pendentes } from "./fila.js";
 import { telaPrint } from "./print.js";
 import { telaEvolucao, telaAvaliacao, telaMedirCasa, telaSemana } from "./evolucao.js";
 import { telaClientes, telaCliente, telaNovoCliente } from "./admin.js";
 import { telaConquistas, telaPublicarSemana } from "./conquistas.js";
 import { exImg, seloMusculo, musculosDe, carregarMidia, preencherMidia } from "./midia.js";
 import { telaPerfil, avatarHtml } from "./perfil.js";
+import { telaBoasVindas } from "./boasvindas.js";
+import { telaLembrete, desligarLembreteDoAparelho } from "./lembrete.js";
 
 // ---------- cliques e mudanças (delegação) ----------
 document.addEventListener("click", (e) => {
@@ -36,8 +39,15 @@ async function rota() {
   if (!configOk) return telaConfig();
   if (!sessao.user) return telaLogin();
   if (!sessao.perfil || sessao.perfil.id !== sessao.user.id) {
-    try { sessao.perfil = q(await sb.from("perfis").select("*").eq("id", sessao.user.id).maybeSingle()); }
-    catch (e) { erro(e, "Não consegui verificar sua conta"); }
+    const chP = "perfil-" + sessao.user.id;
+    try {
+      sessao.perfil = q(await sb.from("perfis").select("*").eq("id", sessao.user.id).maybeSingle());
+      try { localStorage.setItem(chP, JSON.stringify(sessao.perfil)); } catch { /* */ }
+    } catch (e) {
+      // sem internet: usa o perfil guardado (o servidor continua conferindo tudo quando voltar)
+      let g = null; try { g = JSON.parse(localStorage.getItem(chP)); } catch { /* */ }
+      if (g) sessao.perfil = g; else erro(e, "Não consegui verificar sua conta");
+    }
   }
   const bloqueio = motivoBloqueio(sessao.perfil);
   if (bloqueio) return telaBloqueada(bloqueio);
@@ -45,6 +55,7 @@ async function rota() {
   const [r, a, b] = location.hash.replace(/^#\/?/, "").split("?")[0].split("/");
   const params = new URLSearchParams(location.hash.split("?")[1] || "");
   const admin = sessao.perfil?.papel === "admin";
+  if (!sessao.perfil?.termos_em) return telaBoasVindas();
   try {
     switch (r) {
       case "clientes": if (admin) return await telaClientes(); break;
@@ -63,6 +74,7 @@ async function rota() {
       case "semana": return await telaSemana();
       case "conquistas": return await telaConquistas();
       case "perfil": return await telaPerfil();
+      case "lembrete": return await telaLembrete();
       case "publicar-semana": return await telaPublicarSemana();
       default: return ir("#/hoje");
     }
@@ -74,11 +86,24 @@ async function rota() {
       const m = motivoBloqueio(sessao.perfil);
       if (m) return telaBloqueada(m);
     }
+    if (!navigator.onLine) return telaSemInternet();
     erro(e, "Erro ao abrir a tela");
     render(`<section class="tela"><div class="vazio"><p>Não consegui carregar.</p><a class="btn" href="#/hoje">Voltar ao início</a></div></section>`);
   }
 }
 window.addEventListener("hashchange", rota);
+
+// Sem internet: mostra a última tela Hoje guardada (dá para começar um treino) ou um aviso.
+const chHoje = () => "hoje-html-" + sessao.user?.id;
+function telaSemInternet() {
+  const ativo = treinoAtivo();
+  let html = null; try { html = localStorage.getItem(chHoje()); } catch { /* */ }
+  const faixa = `<div class="sem-net">${ico("info", 16)} Sem internet. O treino funciona normalmente e é enviado quando a conexão voltar.</div>`;
+  if (html && !ativo && /^#\/?(hoje)?$/.test(location.hash || "#/hoje")) { render(html.replace('<section class="tela">', '<section class="tela">' + faixa)); return; }
+  render(`<section class="tela">${faixa}<div class="vazio"><p>Esta tela precisa de internet.</p>
+    ${ativo ? `<a class="btn pri" href="#/treino">${ico("play", 18)} Continuar treino</a>` : html ? `<a class="btn" href="#/hoje">Ir para o início</a>` : ""}</div></section>${nav(location.hash)}`);
+}
+window.addEventListener("offline", () => toast("Sem internet: pode continuar o treino, ele fica salvo no celular", 4000));
 
 sb.auth.onAuthStateChange((_ev, s) => {
   const antes = sessao.user?.id;
@@ -108,7 +133,8 @@ function telaLogin() {
       <label class="campo">Senha<input class="inp" type="password" name="senha" autocomplete="current-password" minlength="6" required></label>
       <button class="btn pri blk" type="submit">Entrar</button>
     </form>
-    <p class="mini mudo" style="margin:0;text-align:center">Ainda não tem acesso? Fale com quem te vendeu o app.</p></section>`);
+    <p class="mini mudo" style="margin:0;text-align:center">Ainda não tem acesso? Fale com quem te vendeu o app.</p>
+    <a class="mini mudo" style="text-align:center" href="termos.html">Termos de uso e Privacidade</a></section>`);
 }
 acoes.entrar = async (form) => {
   const f = new FormData(form);
@@ -116,11 +142,21 @@ acoes.entrar = async (form) => {
   if (error) toast(error.message.includes("Invalid") ? "E-mail ou senha incorretos" : error.message, 4000);
 };
 acoes.sair = async () => {
-  if (!confirm("Sair da conta neste aparelho?")) return;
+  const n = pendentes();
+  if (n && !confirm(`Atenção: ${n} registro(s) do treino ainda não foram enviados (sem internet). Se sair agora, eles se perdem. Sair mesmo assim?`)) return;
+  if (!n && !confirm("Sair da conta neste aparelho?")) return;
+  await desligarLembreteDoAparelho();
+  limparDadosLocais();
   salvarTreinoAtivo(null);
   await sb.auth.signOut();
 };
-acoes.sairDireto = async () => { salvarTreinoAtivo(null); await sb.auth.signOut(); };
+acoes.sairDireto = async () => { limparDadosLocais(); salvarTreinoAtivo(null); await sb.auth.signOut(); };
+// ao sair: apaga o que é desta conta no celular (fila, telas e treinos guardados)
+function limparDadosLocais() {
+  try {
+    Object.keys(localStorage).filter((k) => /^(fila-envio|hoje-html-|perfil-|treino-dados)/.test(k)).forEach((k) => localStorage.removeItem(k));
+  } catch { /* */ }
+}
 acoes.verificarDeNovo = () => { sessao.perfil = null; rota(); };
 
 function motivoBloqueio(p) {
@@ -241,7 +277,7 @@ async function telaHoje() {
       <button class="btn blk" data-acao="novaFicha">Criar ficha à mão</button></div>`;
   }
 
-  render(`<section class="tela">
+  const htmlHoje = (`<section class="tela">
     <div class="entre"><div class="col" style="gap:4px"><span class="peq mudo">${dataLonga()}</span>
       <button class="nome-btn" data-acao="meuNome" aria-label="Trocar meu nome"><h1>${saudacao()}</h1></button>
       ${(sessao.perfil?.nome || "").trim() ? "" : `<button class="btn peq" style="align-self:flex-start" data-acao="meuNome">${ico("pessoa", 16)} Como quer ser chamado?</button>`}</div>
@@ -260,7 +296,14 @@ async function telaHoje() {
       <a class="item tracejado" href="#/print"><span class="letra">${ico("camera", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Atualizar por print</b><span class="mini mudo">Mandou ficha nova na academia? Envie o print</span></span><span class="mudo">${ico("seta", 18)}</span></a></div>` : ""}
   </section>
   ${nav("#/hoje")}`);
-  if (prox && !ativo) carregarMidia(prox.nomes).then(() => preencherMidia()).catch(() => {});
+  render(htmlHoje);
+  try { localStorage.setItem(chHoje(), htmlHoje); } catch { /* */ }
+  guardarParaSemInternet();
+  if (prox && !ativo) carregarMidia(prox.nomes).then(() => {
+    preencherMidia();
+    // guarda a tela já com as fotos (para abrir sem internet)
+    if (["", "#", "#/", "#/hoje"].includes(location.hash)) try { localStorage.setItem(chHoje(), document.getElementById("app").innerHTML); } catch { /* */ }
+  }).catch(() => {});
 }
 acoes.meuNome = async () => {
   const atual = (sessao.perfil?.nome || "").trim();

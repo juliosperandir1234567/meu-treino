@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
 
   // Ler uma ficha não precisa de raciocínio longo: pensar pouco deixa a resposta muito mais rápida.
   let pensarPouco = true;
-  const pedir = (m: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+  const pedir = (m: string) => gfetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
@@ -116,7 +116,8 @@ Deno.serve(async (req) => {
   if (!r.ok) {
     const t = await r.text();
     console.error(`Gemini ${r.status} (modelo ${model}): ${t.slice(0, 800)}`);
-    return json({ erro: `Gemini respondeu ${r.status}`, detalhe: t.slice(0, 500) }, 502);
+    const ocupado = r.status === 429 || r.status === 503;
+    return json({ erro: ocupado ? "A leitura de prints está muito ocupada agora. Tente de novo em 1 minuto." : `Gemini respondeu ${r.status}`, detalhe: t.slice(0, 500) }, 502);
   }
   const g = await r.json();
   console.log(`Leitura ok: ${imagens.length} print(s), modelo ${model}, raciocínio ${pensarPouco ? "baixo" : "padrão"}, ${Date.now() - t0} ms`);
@@ -128,3 +129,17 @@ Deno.serve(async (req) => {
     return json({ erro: "Não consegui entender o print. Tente um print mais nítido.", detalhe: texto.slice(0, 500) }, 422);
   }
 });
+
+// Gemini sobrecarregado (429/500/503) costuma passar em segundos: tenta mais duas vezes antes de desistir.
+function gfetch(url: string, op: RequestInit) { return comRetentativa(() => fetch(url, op)); }
+async function comRetentativa(f: () => Promise<Response>) {
+  let r = await f();
+  for (const espera of [1500, 4000]) {
+    if (![429, 500, 503].includes(r.status)) break;
+    await r.body?.cancel();
+    console.warn(`Gemini ${r.status}: tentando de novo em ${espera} ms`);
+    await new Promise((ok) => setTimeout(ok, espera));
+    r = await f();
+  }
+  return r;
+}

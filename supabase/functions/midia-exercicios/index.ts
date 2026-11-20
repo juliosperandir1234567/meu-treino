@@ -64,7 +64,7 @@ ${faltam.map((n) => "- " + n).join("\n")}
 
 Catálogo:
 ${lista}`;
-    const pedir = (pensar: boolean) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    const pedir = (pensar: boolean) => gfetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
@@ -95,3 +95,17 @@ ${lista}`;
   }
   return json({ ok: true, resultado });
 });
+
+// Gemini sobrecarregado (429/500/503) costuma passar em segundos: tenta mais duas vezes antes de desistir.
+function gfetch(url: string, op: RequestInit) { return comRetentativa(() => fetch(url, op)); }
+async function comRetentativa(f: () => Promise<Response>) {
+  let r = await f();
+  for (const espera of [1500, 4000]) {
+    if (![429, 500, 503].includes(r.status)) break;
+    await r.body?.cancel();
+    console.warn(`Gemini ${r.status}: tentando de novo em ${espera} ms`);
+    await new Promise((ok) => setTimeout(ok, espera));
+    r = await f();
+  }
+  return r;
+}

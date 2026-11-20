@@ -300,3 +300,21 @@ nav.nav > div { background: none; -webkit-backdrop-filter: none; backdrop-filter
 nav.nav a { border-radius: 12px; padding: 6px 0 4px; font-size: 11px; }
 nav.nav a.at { background: none; color: var(--ac); }
 nav.nav a.at svg { background: rgba(37,99,235,.12); border-radius: 10px; padding: 3px 12px; box-sizing: content-box; }
+
+/* sem internet */
+.sem-net { display: flex; gap: 8px; align-items: center; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; border-radius: 14px; padding: 10px 12px; font-size: 13px; font-weight: 500; }
+.fila-info { align-self: flex-start; background: #FEF3C7; color: #92400E; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+.fila-info[hidden] { display: none; }
+
+/* boas-vindas */
+.bv-topo { align-items: flex-start; gap: 12px; }
+.bv-passos { gap: 16px; }
+.bv-passo { display: flex; gap: 12px; align-items: flex-start; }
+.bv-num { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: rgba(37,99,235,.10); color: var(--ac); }
+.aceite { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--mudo); line-height: 1.45; }
+.aceite input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--ac); }
+.aceite a { color: var(--ac); font-weight: 600; }
+/* lembrete */
+.dias-lem { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.dias-lem button { border: 1px solid var(--borda); background: var(--s2); color: var(--mudo); border-radius: 12px; padding: 10px 0; font: inherit; font-size: 12px; font-weight: 600; }
+.dias-lem button.at { background: var(--ac); border-color: var(--ac); color: #FFFFFF; }

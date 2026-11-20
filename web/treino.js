@@ -5,6 +5,7 @@ import {
   carregarImagem, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha, grafico,
 } from "./util.js";
 import { exImg, carregarMidia, preencherMidia } from "./midia.js";
+import { idNovo, enfileirar, enviar, pendentes, aoMudarFila } from "./fila.js";
 
 let D = null; // dados do treino carregados
 
@@ -12,24 +13,72 @@ let D = null; // dados do treino carregados
 export async function iniciarTreino(fichaId) {
   const ativo = treinoAtivo();
   if (ativo && !confirm("Já existe um treino em andamento. Começar outro mesmo assim?")) return ir("#/treino");
-  const f = q(await sb.from("fichas").select("*").eq("id", fichaId).single());
+  let f;
+  try { f = q(await sb.from("fichas").select("*").eq("id", fichaId).single()); }
+  catch (e) { f = guardado(fichaId)?.f; if (!f) throw new Error("Sem internet, e este treino ainda não foi aberto neste celular"); }
   const nome = `Treino ${f.letra}${f.nome ? " · " + f.nome : ""}`;
-  const s = q(await sb.from("sessoes").insert({ ficha_id: f.id, ficha_nome: nome, inicio: new Date().toISOString() }).select().single());
+  const sid = idNovo(), inicio = new Date().toISOString();
+  enfileirar({ tipo: "ins", tab: "sessoes", id: sid, dados: { ficha_id: f.id, ficha_nome: nome, inicio } });
   destravarAudio();
-  salvarTreinoAtivo({ sessaoId: s.id, fichaId: f.id, fichaNome: nome, idx: 0, opcoes: {}, ultimaSerie: null, descansoAte: null, descansoTotal: 0 });
+  salvarTreinoAtivo({ sessaoId: sid, fichaId: f.id, fichaNome: nome, inicio, feitas: [], idx: 0, opcoes: {}, ultimaSerie: null, descansoAte: null, descansoTotal: 0 });
   D = null;
   ir("#/treino");
 }
 
+// ---------- dados guardados no celular (para treinar sem internet) ----------
+const chDados = (id) => "treino-dados-" + id;
+function guardado(fichaId) { try { return JSON.parse(localStorage.getItem(chDados(fichaId))); } catch { return null; } }
+function guardar(fichaId, v) { try { localStorage.setItem(chDados(fichaId), JSON.stringify({ ...v, em: Date.now() })); } catch { /* sem espaço */ } }
+// Guarda todas as fichas de uma vez (no máximo a cada 6 h), para poder começar qualquer treino sem sinal.
+export async function guardarParaSemInternet() {
+  try {
+    if (!navigator.onLine || Date.now() - Number(localStorage.getItem("treino-dados-em") || 0) < 6 * 36e5) return;
+    const [rf, re, rq, rh] = await Promise.all([
+      sb.from("fichas").select("*"),
+      sb.from("exercicios").select("*").eq("ativo", true).order("ordem"),
+      sb.from("equipamentos").select("*"),
+      sb.from("series_feitas").select("*").order("feita_em", { ascending: false }).limit(800),
+    ]);
+    const fichas = q(rf), exs = q(re), eqs = q(rq), hist = q(rh);
+    for (const f of fichas) {
+      const meus = exs.filter((e) => e.ficha_id === f.id), ids = new Set(meus.map((e) => e.id));
+      guardar(f.id, { f, exs: meus, eqs: eqs.filter((e) => ids.has(e.exercicio_id)), hist: hist.filter((x) => ids.has(x.exercicio_id)).slice(0, 250) });
+    }
+    localStorage.setItem("treino-dados-em", String(Date.now()));
+  } catch { /* tenta outro dia */ }
+}
+
 async function carregar(t) {
-  const s = q(await sb.from("sessoes").select("*").eq("id", t.sessaoId).single());
-  const exs = q(await sb.from("exercicios").select("*").eq("ficha_id", t.fichaId).eq("ativo", true).order("ordem"));
-  const ids = exs.map((e) => e.id);
-  const eqs = ids.length ? q(await sb.from("equipamentos").select("*").in("exercicio_id", ids)) : [];
-  const feitas = q(await sb.from("series_feitas").select("*").eq("sessao_id", t.sessaoId).order("feita_em"));
-  const hist = ids.length ? q(await sb.from("series_feitas").select("*").in("exercicio_id", ids).neq("sessao_id", t.sessaoId).order("feita_em", { ascending: false }).limit(600)) : [];
-  const urls = await fotoUrls(eqs.map((e) => e.foto_path));
-  D = { sessaoId: t.sessaoId, s, exs, eqs, feitas, hist, urls, avisos: [], avisouAcima: {} };
+  let exs, eqs, hist, urls = {};
+  try {
+    const [rf, re] = await Promise.all([
+      sb.from("fichas").select("*").eq("id", t.fichaId).single(),
+      sb.from("exercicios").select("*").eq("ficha_id", t.fichaId).eq("ativo", true).order("ordem"),
+    ]);
+    const f = q(rf); exs = q(re);
+    const ids = exs.map((e) => e.id);
+    const [rq, rh] = await Promise.all([
+      ids.length ? sb.from("equipamentos").select("*").in("exercicio_id", ids) : { data: [] },
+      ids.length ? sb.from("series_feitas").select("*").in("exercicio_id", ids).neq("sessao_id", t.sessaoId).order("feita_em", { ascending: false }).limit(600) : { data: [] },
+    ]);
+    eqs = q(rq); hist = q(rh);
+    guardar(t.fichaId, { f, exs, eqs, hist: hist.slice(0, 250) });
+    try { urls = await fotoUrls(eqs.map((e) => e.foto_path)); } catch { /* fotos ficam para depois */ }
+  } catch (e) {
+    // sem internet: usa o que ficou guardado da última vez
+    const g = guardado(t.fichaId);
+    if (!g) throw e;
+    exs = g.exs; eqs = g.eqs; hist = (g.hist || []).filter((x) => x.sessao_id !== t.sessaoId);
+  }
+  if (!t.feitas) {   // treino começado numa versão antiga do app
+    try { t.feitas = q(await sb.from("series_feitas").select("*").eq("sessao_id", t.sessaoId).order("feita_em")); } catch { t.feitas = []; }
+    salvarTreinoAtivo(t);
+  }
+  if (!t.inicio) {
+    try { t.inicio = q(await sb.from("sessoes").select("inicio").eq("id", t.sessaoId).single()).inicio; } catch { t.inicio = new Date().toISOString(); }
+    salvarTreinoAtivo(t);
+  }
+  D = { sessaoId: t.sessaoId, s: { inicio: t.inicio }, exs, eqs, feitas: t.feitas, hist, urls, avisos: [], avisouAcima: {} };
   // imagens do movimento: chegam em segundo plano e entram na tela sem atrapalhar
   carregarMidia(exs.map((e) => e.nome)).then(() => preencherMidia()).catch(() => {});
 }
@@ -71,7 +120,13 @@ export async function telaTreino() {
     if (resta <= 10 && resta > 0 && !avisou10) { avisou10 = true; bip(1); }
     if (resta <= 0 && !avisou0) { avisou0 = true; bip(3); }
   }, 1000);
-  limpeza.fn = () => { clearInterval(timer); manterTelaLigada(false); };
+  const tirarOuvinte = aoMudarFila(mostrarFila);
+  limpeza.fn = () => { clearInterval(timer); manterTelaLigada(false); tirarOuvinte(); };
+}
+function mostrarFila(n = pendentes()) {
+  const el = document.getElementById("filaInfo"); if (!el) return;
+  el.hidden = !n;
+  el.textContent = `Sem internet · ${n} ${n === 1 ? "registro guardado" : "registros guardados"} no celular`;
 }
 
 function desenharTreino(rolar = false) {
@@ -144,7 +199,8 @@ function desenharTreino(rolar = false) {
     <div class="topo">${botaoVoltar("#/hoje")}<div class="tit" style="align-items:center"><b class="num" style="font-size:17px">${h(t.fichaNome)}</b>
       <span class="peq mudo">Início ${hora(D.s.inicio)} · <span id="decorrido">${mmss((Date.now() - new Date(D.s.inicio)) / 1000)}</span> de treino</span></div><span style="width:44px"></span></div>
     <div class="col" style="gap:6px"><div class="entre mini mudo"><span>Exercício ${t.idx + 1} de ${n} · ${pct}% feito</span>
-      <button class="btn peq" style="min-height:32px" data-acao="listaExs">${ico("lista", 15)} Ver todos</button></div><div class="barra"><div style="width:${pct}%"></div></div></div>
+      <button class="btn peq" style="min-height:32px" data-acao="listaExs">${ico("lista", 15)} Ver todos</button></div><div class="barra"><div style="width:${pct}%"></div></div>
+      <span id="filaInfo" class="fila-info" ${pendentes() ? "" : "hidden"}>Sem internet · ${pendentes()} registros guardados no celular</span></div>
     <div class="exs">${D.exs.map((e, i) => `<button data-acao="irEx" data-i="${i}" class="${i === t.idx ? "at" : exsFeitos.has(e.id) ? "fe" : ""}" aria-label="${h(e.nome)}">${i + 1}</button>`).join("")}</div>
     ${avisos}
     <div class="cartao">
@@ -240,19 +296,22 @@ acoes.feitoSerie = async (el) => {
   const opcao = t.opcoes[ex.id] || 1;
   const ja = D.feitas.find((x) => x.exercicio_id === ex.id && x.numero === n);
   if (ja) { // desfazer
-    q(await sb.from("series_feitas").delete().eq("id", ja.id));
+    enfileirar({ tipo: "del", tab: "series_feitas", id: ja.id });
     D.feitas = D.feitas.filter((x) => x.id !== ja.id);
+    t.feitas = D.feitas; salvarTreinoAtivo(t);
     return desenharTreino();
   }
   const carga = num(document.getElementById(`kg-${n}`).value);
   const reps = num(document.getElementById(`rp-${n}`).value);
   const agora = new Date();
   const descanso = t.ultimaSerie ? Math.round((agora - new Date(t.ultimaSerie)) / 1000) : null;
-  const linha = q(await sb.from("series_feitas").insert({
-    sessao_id: t.sessaoId, exercicio_id: ex.id, exercicio_nome: ex.nome, equipamento_opcao: opcao, numero: n,
+  const linha = {
+    id: idNovo(), sessao_id: t.sessaoId, exercicio_id: ex.id, exercicio_nome: ex.nome, equipamento_opcao: opcao, numero: n,
     carga, reps: reps === null ? null : Math.round(reps), descanso_seg: descanso && descanso < 1800 ? descanso : null, feita_em: agora.toISOString(),
-  }).select().single());
+  };
+  enfileirar({ tipo: "ins", tab: "series_feitas", id: linha.id, dados: { ...linha } });
   D.feitas.push(linha);
+  t.feitas = D.feitas;
   t.ultimaSerie = agora.toISOString();
   const feitasEx = D.feitas.filter((x) => x.exercicio_id === ex.id).length;
   if (feitasEx < ex.series || t.idx + 1 < D.exs.length) {
@@ -289,7 +348,7 @@ acoes.feitoSerie = async (el) => {
 acoes.fecharAviso = (el) => { D.avisos = D.avisos.filter((a) => a.id !== el.dataset.id); desenharTreino(); };
 acoes.novaCarga = async (el) => {
   const t = treinoAtivo(); const ex = D.exs[t.idx]; const carga = num(el.dataset.carga);
-  q(await sb.from("exercicios").update({ carga_prevista: carga }).eq("id", ex.id));
+  enfileirar({ tipo: "upd", tab: "exercicios", id: ex.id, dados: { carga_prevista: carga } });
   ex.carga_prevista = carga;
   D.avisos = D.avisos.filter((a) => !(a.exId === ex.id && a.tipo === "acima"));
   toast(`Nova carga: ${kg(carga)}`); desenharTreino();
@@ -305,13 +364,17 @@ acoes.finalizar = async () => {
   const t = treinoAtivo();
   if (!D.feitas.length) {
     if (!confirm("Nenhuma série marcada. Descartar este treino?")) return;
-    q(await sb.from("sessoes").delete().eq("id", t.sessaoId));
+    enfileirar({ tipo: "del", tab: "sessoes", id: t.sessaoId });
     salvarTreinoAtivo(null); D = null; return ir("#/hoje");
   }
   const previstas = D.exs.reduce((s, e) => s + e.series, 0);
   if (D.feitas.length < previstas && !confirm(`Você fez ${D.feitas.length} de ${previstas} séries. Finalizar mesmo assim?`)) return;
-  q(await sb.from("sessoes").update({ fim: new Date().toISOString() }).eq("id", t.sessaoId));
+  enfileirar({ tipo: "upd", tab: "sessoes", id: t.sessaoId, dados: { fim: new Date().toISOString() } });
   salvarTreinoAtivo(null); D = null;
+  if (await enviar()) {
+    toast("Sem internet: o treino ficou salvo no celular e vai ser enviado quando a internet voltar", 6000);
+    return ir("#/hoje");
+  }
   ir(`#/fim/${t.sessaoId}`);
 };
 

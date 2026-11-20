@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F3F6FB">
+  <title>Termos e Privacidade · Meu Treino</title>
+  <link rel="icon" href="icon.svg">
+  <style>
+    :root { --bg: #F3F6FB; --s1: #FFFFFF; --borda: #E1E7F0; --txt: #0F172A; --mudo: #64748B; --ac: #2563EB; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--txt); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 20px) 16px 48px; }
+    .voltar { display: inline-flex; align-items: center; gap: 6px; color: var(--ac); text-decoration: none; font-weight: 600; margin-bottom: 12px; }
+    h1 { font-size: 26px; line-height: 1.2; margin: 0 0 4px; }
+    h2 { font-size: 18px; margin: 28px 0 6px; }
+    .cartao { background: var(--s1); border: 1px solid var(--borda); border-radius: 18px; padding: 18px 18px 8px; margin-top: 16px; }
+    .mudo { color: var(--mudo); }
+    ul { padding-left: 20px; margin: 6px 0; }
+    li { margin: 4px 0; }
+    nav { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; }
+    nav a { background: var(--s1); border: 1px solid var(--borda); border-radius: 999px; padding: 6px 12px; text-decoration: none; color: var(--txt); font-size: 13px; font-weight: 600; }
+  </style>
+</head>
+<body>
+<main>
+  <a class="voltar" href="./">‹ Voltar ao app</a>
+  <h1>Termos de uso e Política de privacidade</h1>
+  <p class="mudo" style="margin:0">Meu Treino · versão de 20/11/2026</p>
+  <nav><a href="#termos">Termos de uso</a><a href="#privacidade">Privacidade (LGPD)</a><a href="#direitos">Seus direitos</a></nav>
+
+  <section class="cartao" id="termos">
+    <h2 style="margin-top:0">1. Termos de uso</h2>
+    <p>O <b>Meu Treino</b> é um aplicativo para anotar treinos de musculação, acompanhar cargas, medidas e evolução. Ao criar sua conta e marcar “Li e aceito”, você concorda com estes termos.</p>
+    <ul>
+      <li><b>Acesso pessoal.</b> A conta é individual e criada pelo responsável pelo app. Não compartilhe sua senha.</li>
+      <li><b>Período de acesso.</b> O acesso vale pelo período contratado. Ao vencer, o app fica bloqueado até a renovação, mas seus dados continuam guardados.</li>
+      <li><b>Não substitui um profissional.</b> As sugestões de carga, as explicações de “como fazer” e a leitura dos prints são geradas automaticamente (inclusive por inteligência artificial) e podem conter erros. Elas não substituem a orientação de um profissional de educação física ou de saúde. Treine dentro dos seus limites e procure um médico antes de começar se tiver qualquer condição de saúde.</li>
+      <li><b>Uso correto.</b> Não é permitido usar o app para fins ilegais, tentar acessar dados de outras pessoas ou atrapalhar o funcionamento do serviço.</li>
+      <li><b>Disponibilidade.</b> Fazemos o possível para o app funcionar sempre, mas podem acontecer falhas ou manutenções. Os treinos marcados sem internet ficam no seu celular e são enviados quando a conexão volta.</li>
+      <li><b>Mudanças.</b> Estes termos podem ser atualizados. Se a mudança for importante, avisaremos no app.</li>
+    </ul>
+  </section>
+
+  <section class="cartao" id="privacidade">
+    <h2 style="margin-top:0">2. Política de privacidade</h2>
+    <p>Esta política explica quais dados o Meu Treino usa e por quê, conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).</p>
+    <h2>Quais dados usamos</h2>
+    <ul>
+      <li><b>Conta:</b> nome, e-mail e foto de perfil (opcional).</li>
+      <li><b>Treinos:</b> fichas, exercícios, séries, cargas, repetições, tempos de descanso e datas.</li>
+      <li><b>Avaliação física:</b> peso, medidas do corpo e percentual de gordura que você mesmo lança. Esses são <b>dados de saúde</b> (dados sensíveis) e só são usados com o seu consentimento.</li>
+      <li><b>Fotos:</b> prints de fichas e avaliações que você envia, fotos de equipamentos e foto do treino.</li>
+      <li><b>Lembretes:</b> se você ligar o lembrete, guardamos o endereço técnico de notificação do seu aparelho, os dias e o horário escolhidos.</li>
+    </ul>
+    <h2>Para que usamos</h2>
+    <ul>
+      <li>Montar sua ficha, registrar seus treinos e mostrar gráficos, recordes e sugestões de carga.</li>
+      <li>Ler os prints que você envia para preencher a ficha ou a avaliação automaticamente.</li>
+      <li>Enviar o lembrete de treino, se você ligar.</li>
+      <li>Controlar o seu acesso (data de vencimento e bloqueio).</li>
+    </ul>
+    <p>Não vendemos seus dados, não usamos para propaganda e não compartilhamos com academias ou terceiros para fins comerciais.</p>
+    <h2>Quem pode ver</h2>
+    <ul>
+      <li><b>Só você</b> vê seus treinos, medidas e fotos. O administrador do app consegue ver apenas os dados da conta (nome, e-mail, situação e vencimento do acesso), <b>não</b> os seus treinos nem suas medidas.</li>
+      <li>Para funcionar, o app usa serviços de tecnologia que tratam os dados em nosso nome:
+        <b>Supabase</b> (banco de dados, login e armazenamento das fotos, com servidores nos Estados Unidos),
+        <b>Vercel</b> (hospedagem do app) e <b>Google Gemini</b> (leitura dos prints e explicações dos exercícios — recebe apenas a imagem enviada ou o nome do exercício).
+        Por isso pode haver transferência internacional de dados, sempre com empresas que adotam medidas de segurança reconhecidas.</li>
+    </ul>
+    <h2>Segurança e tempo de guarda</h2>
+    <p>Os dados ficam protegidos por login e por regras que impedem uma conta de ver os dados de outra. Guardamos seus dados enquanto sua conta existir. Se a conta for excluída, os treinos, medidas e fotos são apagados.</p>
+  </section>
+
+  <section class="cartao" id="direitos">
+    <h2 style="margin-top:0">3. Seus direitos</h2>
+    <p>Você pode, a qualquer momento:</p>
+    <ul>
+      <li>confirmar quais dados temos e pedir uma cópia;</li>
+      <li>corrigir dados (a maioria você mesmo corrige no app);</li>
+      <li>retirar o consentimento e pedir a exclusão da conta e de todos os dados;</li>
+      <li>tirar dúvidas sobre o uso dos seus dados.</li>
+    </ul>
+    <p>Para isso, fale com o responsável pelo Meu Treino, <b>Julio Sperandir</b>, pelo mesmo canal (WhatsApp ou e-mail) em que você contratou o acesso. Respondemos em até 15 dias.</p>
+  </section>
+</main>
+</body>
+</html>

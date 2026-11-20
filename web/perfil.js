@@ -36,8 +36,10 @@ export async function telaPerfil() {
       <div class="stat"><span class="mini mudo">Maior carga</span><span class="v">${est.carga_max ? fmt(est.carga_max) + " kg" : "—"}</span></div></div>
     <div class="col" style="gap:8px">
       <a class="item" href="#/conquistas"><span class="letra">🏆</span><span class="col" style="flex:1;gap:2px"><b>Calendário e conquistas</b><span class="mini mudo">Seus dias de treino e medalhas</span></span><span class="mudo">${ico("seta", 18)}</span></a>
+      <a class="item" href="#/lembrete"><span class="letra">${ico("sino", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Lembrete de treino</b><span class="mini mudo">Aviso no celular nos seus dias de treino</span></span><span class="mudo">${ico("seta", 18)}</span></a>
       <button class="item" data-acao="meuNome"><span class="letra">${ico("lapis", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Trocar meu nome</b><span class="mini mudo">Como você aparece no app</span></span><span class="mudo">${ico("seta", 18)}</span></button>
       ${admin ? `<a class="item" href="#/clientes"><span class="letra g" style="width:40px;height:40px;font-size:18px">${ico("chave", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Painel de clientes</b><span class="mini mudo">Criar contas, renovar e bloquear acesso</span></span><span class="mudo">${ico("seta", 18)}</span></a>` : ""}
+      <a class="item" href="termos.html"><span class="letra">${ico("info", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Termos e privacidade</b><span class="mini mudo">Como seus dados são usados</span></span><span class="mudo">${ico("seta", 18)}</span></a>
       <button class="item" data-acao="sair"><span class="letra">${ico("sair", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Sair da conta</b><span class="mini mudo">Neste aparelho</span></span></button>
     </div>
   </section>${nav("#/perfil")}`);

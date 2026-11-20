@@ -238,3 +238,52 @@ language sql volatile security definer set search_path = '' as $$
 $$;
 revoke execute on function public.definir_minha_foto(text) from public, anon;
 grant execute on function public.definir_minha_foto(text) to authenticated;
+
+-- ---------- Aceite dos termos de uso (LGPD) ----------
+alter table public.perfis add column if not exists termos_em timestamptz;
+create or replace function public.aceitar_termos() returns void
+language sql volatile security definer set search_path = '' as $$
+  update public.perfis set termos_em = now() where id = auth.uid() and termos_em is null;
+$$;
+revoke execute on function public.aceitar_termos() from public, anon;
+grant execute on function public.aceitar_termos() to authenticated;
+
+-- ---------- Lembrete de treino (Web Push) ----------
+create table if not exists public.lembretes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  hora smallint not null default 18 check (hora between 0 and 23),
+  dias smallint[] not null default '{1,2,3,4,5}',   -- 0 = domingo ... 6 = sábado
+  ultimo_envio date,
+  criado_em timestamptz not null default now()
+);
+create index if not exists lembretes_user on public.lembretes(user_id);
+alter table public.lembretes enable row level security;
+drop policy if exists "meus lembretes" on public.lembretes;
+create policy "meus lembretes" on public.lembretes for all to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()) and (select public.conta_ativa()));
+grant select, insert, update, delete on public.lembretes to authenticated;
+grant select, insert, update, delete on public.lembretes to service_role;
+
+-- chaves VAPID e token do agendador: só o servidor lê (a função "lembretes" cria as chaves na 1ª vez)
+create table if not exists public.push_config (
+  id smallint primary key default 1 check (id = 1),
+  publica text,
+  privada text,
+  token_cron text not null default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')
+);
+alter table public.push_config enable row level security;
+revoke all on public.push_config from anon, authenticated;
+grant select, insert, update on public.push_config to service_role;
+insert into public.push_config (id) values (1) on conflict do nothing;
+
+create extension if not exists pg_net;
+create extension if not exists pg_cron;
+-- agendamento (uma vez): a cada hora chama a função "lembretes"
+-- select cron.schedule('lembretes-de-treino', '0 * * * *', $$
+--   select net.http_post(url := 'https://<PROJETO>.supabase.co/functions/v1/lembretes',
+--     headers := jsonb_build_object('Content-Type','application/json','x-cron',(select token_cron from public.push_config where id=1)),
+--     body := '{}'::jsonb, timeout_milliseconds := 60000); $$);
