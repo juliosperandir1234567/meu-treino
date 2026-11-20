@@ -318,3 +318,7 @@ nav.nav a.at svg { background: rgba(37,99,235,.12); border-radius: 10px; padding
 .dias-lem { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .dias-lem button { border: 1px solid var(--borda); background: var(--s2); color: var(--mudo); border-radius: 12px; padding: 10px 0; font: inherit; font-size: 12px; font-weight: 600; }
 .dias-lem button.at { background: var(--ac); border-color: var(--ac); color: #FFFFFF; }
+
+/* colar texto do treino */
+.txt-ficha { min-height: 200px; resize: vertical; font: inherit; line-height: 1.5; padding: 12px; }
+.exemplo-txt { margin: 0; background: var(--s2); border-radius: 12px; padding: 10px 12px; font: 13px/1.55 ui-monospace, Menlo, Consolas, monospace; color: var(--mudo); white-space: pre-wrap; }

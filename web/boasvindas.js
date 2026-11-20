@@ -15,7 +15,7 @@ export function telaBoasVindas() {
       <p style="margin:0;opacity:.9">Seu treino, suas cargas e sua evolução num lugar só. Leva 1 minuto para começar.</p>
     </div>
     <div class="cartao bv-passos">
-      ${passo(1, "camera", "Mande o print da sua ficha", "Tire um print do treino no app da academia. A IA monta a ficha com séries, repetições e cargas.")}
+      ${passo(1, "lista", "Cole o seu treino", "Cole o texto da ficha, um exercício por linha (ex.: Supino reto 4x10 30kg). O app monta tudo sozinho.")}
       ${passo(2, "check", "Marque cada série", "O app lembra a carga da última vez, conta o descanso e funciona até sem internet.")}
       ${passo(3, "sobe", "Acompanhe a evolução", "Toda semana: o que subiu, seus recordes e quando é hora de aumentar o peso.")}
     </div>

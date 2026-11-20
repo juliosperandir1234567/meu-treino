@@ -3,21 +3,36 @@ import {
   sb, acoes, mudancas, render, ir, h, toast, q, num, kg, normal, ico, botaoVoltar,
   reduzir, blobBase64, enviarFoto, carregarImagem,
 } from "./util.js";
+import { lerTexto } from "./texto.js";
 
-let P = { tipo: "treino", qual: "", imgs: [], lendo: false, res: null, destino: null, novaLetra: "", novaNome: "", marc: {}, fichas: [] };
+let P = { tipo: "texto", texto: "", qual: "", imgs: [], lendo: false, res: null, destino: null, novaLetra: "", novaNome: "", marc: {}, fichas: [] };
 
 export async function telaPrint(tipo) {
   if (P.tipo !== tipo) P = { ...P, tipo, res: null };
-  if (P.res && P.tipo === "treino") return desenharRevisao();
+  if (P.res && P.tipo !== "avaliacao") return desenharRevisao();
   if (P.res && P.tipo === "avaliacao") return desenharAvaliacao();
   desenharEscolha();
 }
 
 function desenharEscolha() {
   render(`<section class="tela">
-    <div class="topo">${botaoVoltar(P.tipo === "avaliacao" ? "#/avaliacao" : "#/hoje")}<div class="tit"><h2>Atualizar por print</h2></div></div>
-    <div class="abas"><button class="${P.tipo === "treino" ? "at" : ""}" data-acao="tipoPrint" data-t="treino">Treino</button>
-      <button class="${P.tipo === "avaliacao" ? "at" : ""}" data-acao="tipoPrint" data-t="avaliacao">Avaliação física</button></div>
+    <div class="topo">${botaoVoltar(P.tipo === "avaliacao" ? "#/avaliacao" : "#/hoje")}<div class="tit"><h2>${P.tipo === "avaliacao" ? "Avaliação por print" : "Atualizar treino"}</h2></div></div>
+    <div class="abas"><button class="${P.tipo === "texto" ? "at" : ""}" data-acao="tipoPrint" data-t="texto">Colar texto</button>
+      <button class="${P.tipo === "treino" ? "at" : ""}" data-acao="tipoPrint" data-t="treino">Print</button>
+      <button class="${P.tipo === "avaliacao" ? "at" : ""}" data-acao="tipoPrint" data-t="avaliacao">Avaliação</button></div>
+    ${P.tipo === "texto" ? `<div class="cartao">
+      <b>Cole ou digite seu treino</b>
+      <span class="peq mudo">Um exercício por linha, do jeito que estiver na ficha. Exemplo:</span>
+      <pre class="exemplo-txt">Treino B - Costas
+Puxada frontal 4x12 35kg
+Remada baixa 3 x 10-12 30 kg
+Rosca direta 3x10 descanso 60s</pre>
+      <textarea id="txtFicha" class="inp txt-ficha" rows="10" placeholder="Cole aqui o texto do treino…" autocapitalize="sentences">${h(P.texto)}</textarea>
+      <label class="campo">Qual treino? <span class="mini mudo">(opcional, se o texto tiver A, B, C juntos)</span>
+        <input class="inp" data-muda="qualTreino" value="${h(P.qual)}" placeholder="Ex.: B" maxlength="20"></label>
+    </div>
+  </section>
+  <div class="rodape"><div><button class="btn pri" data-acao="lerTextoFicha">Ler texto</button></div></div>` : `
     <div class="cartao">
       <b>${P.tipo === "treino" ? "Mande o print da ficha" : "Mande o print da avaliação"}</b>
       <span class="peq mudo">${P.tipo === "treino"
@@ -30,9 +45,18 @@ function desenharEscolha() {
       <button class="btn blk" data-acao="addPrint">${ico("imagem", 18)} ${P.imgs.length ? "Adicionar mais prints" : "Escolher prints"}</button>
     </div>
   </section>
-  <div class="rodape"><div><button class="btn pri" data-acao="lerPrint" ${P.imgs.length && !P.lendo ? "" : "disabled"}>${P.lendo ? '<span class="girando"></span> Lendo o print…' : "Ler print"}</button></div></div>`);
+  <div class="rodape"><div><button class="btn pri" data-acao="lerPrint" ${P.imgs.length && !P.lendo ? "" : "disabled"}>${P.lendo ? '<span class="girando"></span> Lendo o print…' : "Ler print"}</button></div></div>`}`);
 }
 mudancas.qualTreino = (el) => { P.qual = el.value.trim(); };
+acoes.lerTextoFicha = async () => {
+  P.texto = document.getElementById("txtFicha")?.value || "";
+  if (!P.texto.trim()) return toast("Cole o texto do treino primeiro");
+  const res = lerTexto(P.texto, P.qual);
+  if (!res.exercicios.length) return toast("Não achei exercícios. Coloque um exercício por linha, ex.: Supino reto 4x10 30kg", 5000);
+  P.res = res;
+  await prepararRevisao();
+  desenharRevisao();
+};
 acoes.tipoPrint = (el) => { ir(`#/print?tipo=${el.dataset.t}`); };
 acoes.addPrint = async () => {
   const inp = document.getElementById("arquivo");
@@ -125,7 +149,7 @@ function desenharRevisao() {
   const comFoto = P.res.exercicios.filter((p) => p.miniatura).length;
   render(`<section class="tela">
     <div class="topo"><button class="ico" data-acao="voltarPrint" aria-label="Voltar">${ico("voltar")}</button><div class="tit"><h2>Conferir antes de salvar</h2>
-      <span class="mini mudo">Li ${P.res.exercicios.length} exercícios${P.res.titulo ? " · " + h(P.res.titulo) : ""}</span></div></div>
+      <span class="mini mudo">${P.res.exercicios.length} exercícios${P.res.titulo ? " · " + h(P.res.titulo) : ""}</span></div></div>
     <div class="cartao">
       <label class="campo">Salvar em
         <select class="inp" data-muda="destinoPrint">
@@ -142,12 +166,12 @@ function desenharRevisao() {
       ${cont("rem") ? `<span class="chip">${cont("rem")} removido${cont("rem") > 1 ? "s" : ""}</span>` : ""}
       ${cont("igual") ? `<span class="chip">${cont("igual")} igua${cont("igual") > 1 ? "is" : "l"}</span>` : ""}
     </div>
-    ${semDetalhe ? `<div class="cartao lar-borda"><span class="peq">O print mostrou só os nomes. Vou manter as séries que já estavam salvas; exercícios novos entram com 3 × 12 para você ajustar.</span></div>` : ""}
+    ${semDetalhe ? `<div class="cartao lar-borda"><span class="peq">Vieram só os nomes. Vou manter as séries que já estavam salvas; exercícios novos entram com 3 × 12 para você ajustar.</span></div>` : ""}
     <div class="col">${itens.map((it) => `<label class="item dif">
       <input type="checkbox" data-muda="marcarPrint" data-k="${it.k}" ${P.marc[it.k] ? "checked" : ""} ${it.tipo === "igual" ? "disabled" : ""} aria-label="Aplicar">
       <span class="tag ${it.tipo}">${nomeTag[it.tipo]}</span>
       <span class="col" style="gap:2px;min-width:0"><b class="${it.tipo === "rem" ? "riscado" : ""}">${h(it.p?.nome || it.e.nome)}</b><span class="mini mudo">${h(it.det)}</span></span></label>`).join("")}</div>
-    ${cont("rem") ? `<span class="mini mudo">Se o print não mostrou a ficha inteira, desmarque os "Removido".</span>` : ""}
+    ${cont("rem") ? `<span class="mini mudo">Se não veio a ficha inteira, desmarque os "Removido".</span>` : ""}
     ${comFoto ? `<span class="mini mudo">${ico("imagem", 14)} ${comFoto} foto${comFoto > 1 ? "s" : ""} de aparelho no print: viram a Opção 1 do equipamento (quando ainda não tem foto).</span>` : ""}
   </section>
   <div class="rodape"><div><button class="btn pri" data-acao="salvarPrint">Salvar ${P.destino === "nova" ? "ficha nova" : "alterações"}</button></div></div>`);
@@ -191,8 +215,8 @@ acoes.salvarPrint = async (el) => {
     }
     q(await sb.from("fichas").update({ atualizado_em: new Date().toISOString(), origem: "print" }).eq("id", fichaId));
     await salvarMiniaturas(idPorIndice);
-    toast("Ficha atualizada pelo print");
-    P = { tipo: "treino", imgs: [], lendo: false, res: null, destino: null, novaLetra: "", novaNome: "", marc: {}, fichas: [] };
+    toast("Ficha atualizada");
+    P = { tipo: "texto", texto: "", qual: "", imgs: [], lendo: false, res: null, destino: null, novaLetra: "", novaNome: "", marc: {}, fichas: [] };
     ir(`#/ficha/${fichaId}`);
   } catch (e) {
     toast(`Erro ao salvar: ${e.message}`, 5000);

@@ -67,7 +67,7 @@ async function rota() {
       case "equip": return await telaEquipamento(a);
       case "fim": return await telaFim(a);
       case "publicar": return await telaPublicar(a);
-      case "print": return await telaPrint(params.get("tipo") || "treino");
+      case "print": return await telaPrint(params.get("tipo") || "texto");
       case "evolucao": return await telaEvolucao(params.get("aba") || "medidas", params.get("ex"));
       case "avaliacao": return await telaAvaliacao();
       case "medir": return await telaMedirCasa();
@@ -272,8 +272,8 @@ async function telaHoje() {
       <a class="mini mudo" style="text-align:center;text-decoration:none" href="#/ficha/${prox.id}">Ver a ficha completa ›</a></div>`;
   } else {
     destaque = `<div class="heroi vazio"><span class="letra xg">${ico("camera", 30)}</span>
-      <h2>Comece pelo print</h2><p class="mudo" style="margin:0">Tire um print do seu treino no app da academia e mande aqui. Eu monto a ficha pra você.</p>
-      <a class="btn pri blk grande" href="#/print">${ico("camera", 18)} Mandar print</a>
+      <h2>Comece pela sua ficha</h2><p class="mudo" style="margin:0">Cole o texto do seu treino (um exercício por linha) e o app monta a ficha pra você.</p>
+      <a class="btn pri blk grande" href="#/print?tipo=texto">${ico("lista", 18)} Colar meu treino</a>
       <button class="btn blk" data-acao="novaFicha">Criar ficha à mão</button></div>`;
   }
 
@@ -293,7 +293,7 @@ async function telaHoje() {
         <span class="col" style="flex:1;gap:3px;min-width:0"><b>${h(f.nome || "Treino " + f.letra)}</b>
         <span class="mini mudo">${f.grupos.length ? h(f.grupos.join(" · ")) + " · " : ""}${f.qtd} exercícios</span></span>
         <span class="col" style="align-items:flex-end;gap:3px">${prox && f.id === prox.id && !ativo ? `<span class="chip ac">Próximo</span>` : ""}<span class="mini mudo">${ultimaPorFicha[f.id] ? haQuanto(ultimaPorFicha[f.id]) : "—"}</span></span></a>`).join("")}
-      <a class="item tracejado" href="#/print"><span class="letra">${ico("camera", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Atualizar por print</b><span class="mini mudo">Mandou ficha nova na academia? Envie o print</span></span><span class="mudo">${ico("seta", 18)}</span></a></div>` : ""}
+      <a class="item tracejado" href="#/print?tipo=texto"><span class="letra">${ico("lista", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Atualizar treino</b><span class="mini mudo">Ficha nova? Cole o texto e o app atualiza</span></span><span class="mudo">${ico("seta", 18)}</span></a></div>` : ""}
   </section>
   ${nav("#/hoje")}`);
   render(htmlHoje);
