@@ -1,7 +1,7 @@
 // Meu Treino — rotas, login, tela Hoje, fichas e edição de exercícios.
 import {
   sb, configOk, sessao, acoes, limpeza, mudancas, render, mostrarGuardada, esquecerTelas, ir, h, toast, erro, q, num, fmt, kg,
-  dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo,
+  dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe,
 } from "./util.js";
 import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino } from "./treino.js";
 import { telaPrint } from "./print.js";
@@ -142,16 +142,38 @@ function telaBloqueada(motivo) {
       <button class="btn blk" data-acao="sairDireto">${ico("sair", 18)} Sair</button></div></section>`);
 }
 
-// ---------- dados ----------
+/// ---------- dados ----------
 export async function carregarFichas() {
   // as duas consultas vão juntas (o servidor fica longe: cada ida e volta conta)
   const [rf, re] = await Promise.all([
     sb.from("fichas").select("*").order("ordem").order("letra"),
-    sb.from("exercicios").select("id, ficha_id").eq("ativo", true),
+    sb.from("exercicios").select("id, ficha_id, nome, series, descanso_seg").eq("ativo", true),
   ]);
   const fichas = q(rf), exs = q(re);
-  fichas.forEach((f) => { f.qtd = exs.filter((e) => e.ficha_id === f.id).length; });
+  fichas.forEach((f) => {
+    const meus = exs.filter((e) => e.ficha_id === f.id);
+    f.qtd = meus.length;
+    f.series = meus.reduce((a, e) => a + (e.series || 0), 0);
+    // tempo estimado: ~45 s por série + o descanso
+    f.minutos = Math.round(meus.reduce((a, e) => a + (e.series || 0) * (45 + (e.descanso_seg || 60)), 0) / 60);
+    // grupos musculares mais presentes na ficha
+    const cont = {};
+    meus.forEach((e) => { const g = grupoDe(e.nome); if (g !== "Outros") cont[g] = (cont[g] || 0) + 1; });
+    f.grupos = Object.keys(cont).sort((a, b) => cont[b] - cont[a]).slice(0, 3);
+  });
   return fichas;
+}
+function haQuanto(iso) {
+  if (!iso) return "";
+  const a = new Date(iso); a.setHours(0, 0, 0, 0);
+  const b = new Date(); b.setHours(0, 0, 0, 0);
+  const d = Math.round((b - a) / 864e5);
+  return d <= 0 ? "hoje" : d === 1 ? "ontem" : `há ${d} dias`;
+}
+function saudacao() {
+  const hr = new Date().getHours();
+  const nome = (sessao.perfil?.nome || "").trim().split(/\s+/)[0];
+  return `${hr < 5 ? "Boa noite" : hr < 12 ? "Bom dia" : hr < 18 ? "Boa tarde" : "Boa noite"}${nome ? ", " + h(nome) : ""}`;
 }
 
 // ---------- HOJE ----------
@@ -160,12 +182,18 @@ async function telaHoje() {
   const ini = inicioSemana();
   const [fichas, rr] = await Promise.all([
     carregarFichas(),
-    sb.from("sessoes").select("id, ficha_id, inicio, fim").order("inicio", { ascending: false }).limit(60),
+    sb.from("sessoes").select("id, ficha_id, inicio, fim").order("inicio", { ascending: false }).limit(200),
   ]);
   const recentes = q(rr);
   const semana = recentes.filter((s) => new Date(s.inicio) >= ini);
   const ultimaPorFicha = {};
   recentes.forEach((s) => { if (s.ficha_id && !ultimaPorFicha[s.ficha_id]) ultimaPorFicha[s.ficha_id] = s.inicio; });
+
+  // sequência de semanas seguidas com treino
+  const semanas = new Set(recentes.map((s) => inicioSemana(new Date(s.inicio)).getTime()));
+  let seq = 0; const cur = new Date(ini);
+  if (!semanas.has(cur.getTime())) cur.setDate(cur.getDate() - 7);
+  while (semanas.has(cur.getTime())) { seq++; cur.setDate(cur.getDate() - 7); }
 
   // próximo treino: o seguinte ao último feito, na ordem da ficha
   let prox = fichas[0];
@@ -177,43 +205,53 @@ async function telaHoje() {
   const dias = nomes.map((n, i) => {
     const d = new Date(ini); d.setDate(d.getDate() + i);
     const feito = semana.find((s) => new Date(s.inicio).toDateString() === d.toDateString());
-    const letra = feito ? (fichas.find((f) => f.id === feito.ficha_id)?.letra || "✓") : "";
-    const cls = feito ? "feito" : d.getTime() === hoje.getTime() ? "hoje" : "";
-    return `<div class="dia">${n}<span class="b ${cls}">${h(letra)}</span></div>`;
+    const letra = feito ? (fichas.find((f) => f.id === feito.ficha_id)?.letra || "✓") : d.getDate();
+    const cls = feito ? "feito" : d.getTime() === hoje.getTime() ? "hoje" : d > hoje ? "depois" : "";
+    return `<div class="dia2 ${cls}"><span class="n">${n}</span><span class="b">${h(letra)}</span></div>`;
   }).join("");
 
+  const chipsGrupo = (f) => f.grupos.map((g) => `<span class="chip">${h(g)}</span>`).join("");
   let destaque;
   if (ativo) {
-    destaque = `<div class="cartao ac-borda"><span class="rot ac">Treino em andamento</span>
-      <h2>${h(ativo.fichaNome || "Treino")}</h2>
-      <a class="btn pri blk" href="#/treino">${ico("play", 18)} Continuar treino</a></div>`;
+    destaque = `<div class="heroi"><span class="rot ac">Treino em andamento</span>
+      <h2 class="heroi-tit">${h(ativo.fichaNome || "Treino")}</h2>
+      <a class="btn pri blk grande" href="#/treino">${ico("play", 20)} Continuar treino</a></div>`;
   } else if (prox) {
-    destaque = `<div class="cartao"><div class="entre"><span class="rot ac">Treino de hoje</span>
-      <span class="mini mudo">${prox.origem === "print" ? "Atualizado por print · " : ""}${new Date(prox.atualizado_em).toLocaleDateString("pt-BR")}</span></div>
-      <div class="linha" style="gap:14px"><span class="letra g">${h(prox.letra)}</span>
-      <div class="col" style="gap:4px"><h2>${h(prox.nome || "Treino " + prox.letra)}</h2><span class="mudo peq">${prox.qtd} exercícios</span></div></div>
-      <div class="grade2" style="grid-template-columns:1fr 2fr">
-        <a class="btn" href="#/ficha/${prox.id}">Ver ficha</a>
-        <button class="btn pri" data-acao="iniciar" data-ficha="${prox.id}">${ico("play", 18)} Iniciar treino</button></div></div>`;
+    const ultimaVez = ultimaPorFicha[prox.id];
+    destaque = `<div class="heroi">
+      <div class="entre"><span class="rot ac">Treino de hoje</span><span class="mini mudo">${ultimaVez ? "Último: " + haQuanto(ultimaVez) : "Ainda não feito"}</span></div>
+      <div class="linha" style="gap:16px;align-items:center"><span class="letra xg">${h(prox.letra)}</span>
+        <div class="col" style="gap:6px;min-width:0"><h2 class="heroi-tit">${h(prox.nome || "Treino " + prox.letra)}</h2>
+        ${prox.grupos.length ? `<div class="linha" style="gap:6px;flex-wrap:wrap">${chipsGrupo(prox)}</div>` : ""}</div></div>
+      <div class="heroi-num">
+        <div><b>${prox.qtd}</b><span>exercícios</span></div>
+        <div><b>${prox.series}</b><span>séries</span></div>
+        <div><b>~${prox.minutos || 0}</b><span>minutos</span></div></div>
+      <button class="btn pri blk grande" data-acao="iniciar" data-ficha="${prox.id}">${ico("play", 20)} Iniciar treino</button>
+      <a class="mini mudo" style="text-align:center;text-decoration:none" href="#/ficha/${prox.id}">Ver a ficha completa ›</a></div>`;
   } else {
-    destaque = `<div class="cartao vazio"><span class="letra g">${ico("camera", 28)}</span>
-      <h2>Comece pelo print</h2><p style="margin:0">Tire um print do seu treino no app da academia e mande aqui. Eu monto a ficha pra você.</p>
-      <a class="btn pri blk" href="#/print">${ico("camera", 18)} Mandar print</a>
+    destaque = `<div class="heroi vazio"><span class="letra xg">${ico("camera", 30)}</span>
+      <h2>Comece pelo print</h2><p class="mudo" style="margin:0">Tire um print do seu treino no app da academia e mande aqui. Eu monto a ficha pra você.</p>
+      <a class="btn pri blk grande" href="#/print">${ico("camera", 18)} Mandar print</a>
       <button class="btn blk" data-acao="novaFicha">Criar ficha à mão</button></div>`;
   }
 
   render(`<section class="tela">
-    <div class="entre"><div class="col" style="gap:4px"><span class="peq mudo">${dataLonga()}</span><h1>Bora treinar</h1></div>
+    <div class="entre"><div class="col" style="gap:4px"><span class="peq mudo">${dataLonga()}</span><h1>${saudacao()}</h1></div>
       <button class="ico" data-acao="sair" aria-label="Sair da conta">${ico("sair")}</button></div>
-    <div class="semana">${dias}</div>
     ${destaque}
-    ${fichas.length ? `<div class="col"><div class="entre"><h3>Minha ficha</h3><button class="btn peq" data-acao="novaFicha">${ico("mais", 16)} Nova</button></div>
-      ${fichas.map((f) => `<a class="item" href="#/ficha/${f.id}"><span class="letra">${h(f.letra)}</span>
-        <span class="col" style="flex:1;gap:2px"><b>${h(f.nome || "Treino " + f.letra)}</b>
-        <span class="mini mudo">${f.qtd} exercícios${ultimaPorFicha[f.id] ? " · último: " + new Date(ultimaPorFicha[f.id]).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : ""}</span></span>
-        <span class="mudo">${ico("seta", 18)}</span></a>`).join("")}</div>` : ""}
+    <a class="cartao semana-cartao" href="#/semana">
+      <div class="entre"><b>Esta semana</b><span class="linha" style="gap:8px">
+        <span class="chip">${semana.length} treino${semana.length === 1 ? "" : "s"}</span>
+        ${seq ? `<span class="chip lar">${ico("fogo", 13, 'style="vertical-align:-2px"')} ${seq} sem. seguida${seq === 1 ? "" : "s"}</span>` : ""}</span></div>
+      <div class="semana2">${dias}</div></a>
+    ${fichas.length ? `<div class="col"><div class="entre"><h3>Minhas fichas</h3><button class="btn peq" data-acao="novaFicha">${ico("mais", 16)} Nova</button></div>
+      ${fichas.map((f) => `<a class="item ficha-item ${prox && f.id === prox.id && !ativo ? "prox" : ""}" href="#/ficha/${f.id}"><span class="letra">${h(f.letra)}</span>
+        <span class="col" style="flex:1;gap:3px;min-width:0"><b>${h(f.nome || "Treino " + f.letra)}</b>
+        <span class="mini mudo">${f.grupos.length ? h(f.grupos.join(" · ")) + " · " : ""}${f.qtd} exercícios</span></span>
+        <span class="col" style="align-items:flex-end;gap:3px">${prox && f.id === prox.id && !ativo ? `<span class="chip ac">Próximo</span>` : ""}<span class="mini mudo">${ultimaPorFicha[f.id] ? haQuanto(ultimaPorFicha[f.id]) : "—"}</span></span></a>`).join("")}
+      <a class="item tracejado" href="#/print"><span class="letra">${ico("camera", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Atualizar por print</b><span class="mini mudo">Mandou ficha nova na academia? Envie o print</span></span><span class="mudo">${ico("seta", 18)}</span></a></div>` : ""}
   </section>
-  ${fichas.length ? `<a class="fab" href="#/print">${ico("camera", 18)} Atualizar por print</a>` : ""}
   ${nav("#/hoje")}`);
 }
 acoes.iniciar = async (el) => { await iniciarTreino(el.dataset.ficha); };

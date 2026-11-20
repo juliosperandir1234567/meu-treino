@@ -147,7 +147,7 @@ canvas.prev { width: 100%; max-width: 280px; border-radius: 16px; align-self: ce
 @media (prefers-reduced-motion: reduce) { #festa i { display: none; } .festa-card { animation: none; } }
 
 /* gráficos da semana */
-.corpo { width: 100%; max-width: 300px; margin: 0 auto; display: block; }
+.corpo { width: 100%; max-width: 360px; margin: 0 auto; display: block; }
 .barras { width: 100%; height: auto; display: block; }
 .barras .b-at { fill: var(--ac); } .barras .b-ant { fill: #3A3F47; }
 .legenda { display: flex; gap: 14px; font-size: 12px; color: var(--mudo); }
@@ -167,3 +167,29 @@ canvas.prev { width: 100%; max-width: 280px; border-radius: 16px; align-self: ce
 .medalha .m-ico { font-size: 28px; filter: grayscale(1); opacity: .35; }
 .medalha.ganha { border-color: var(--ac); } .medalha.ganha .m-ico { filter: none; opacity: 1; }
 .medalha b { font-size: 12.5px; line-height: 1.25; } .medalha span { font-size: 11px; color: var(--mudo); }
+
+/* tela Hoje */
+.heroi { position: relative; overflow: hidden; border-radius: 22px; padding: 20px; display: flex; flex-direction: column; gap: 16px;
+  background: radial-gradient(130% 90% at 100% 0%, rgba(198,244,50,.20), rgba(198,244,50,0) 60%), linear-gradient(180deg, #1C1F23, #15171A);
+  border: 1px solid rgba(198,244,50,.28); }
+.heroi.vazio { align-items: flex-start; }
+.heroi-tit { font-size: 24px; line-height: 1.15; overflow-wrap: anywhere; }
+.letra.xg { width: 68px; height: 68px; border-radius: 20px; font-size: 34px; background: var(--ac); color: var(--ac-txt); box-shadow: 0 8px 28px rgba(198,244,50,.25); }
+.heroi-num { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); background: rgba(14,15,17,.45); border-radius: 14px; padding: 12px 6px; }
+.heroi-num div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.heroi-num div + div { border-left: 1px solid var(--borda); }
+.heroi-num b { font-family: "Space Grotesk", sans-serif; font-size: 22px; }
+.heroi-num span { font-size: 12px; color: var(--mudo); }
+.btn.grande { min-height: 56px; font-size: 16px; border-radius: 16px; }
+.semana-cartao { text-decoration: none; color: var(--txt); }
+.semana2 { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 6px; }
+.dia2 { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.dia2 .n { font-size: 11px; color: var(--mudo); font-weight: 600; }
+.dia2 .b { width: 100%; max-width: 40px; aspect-ratio: 1; border-radius: 12px; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--s2); color: var(--fraco); }
+.dia2.feito .b { background: var(--ac); color: var(--ac-txt); font-family: "Space Grotesk", sans-serif; font-size: 15px; }
+.dia2.hoje .b { background: transparent; border: 2px solid var(--ac); color: var(--ac); }
+.dia2.hoje .n { color: var(--ac); }
+.dia2.depois .b { background: transparent; border: 1px dashed var(--borda); }
+.ficha-item.prox { border-color: rgba(198,244,50,.45); }
+.ficha-item.prox .letra { background: rgba(198,244,50,.14); color: var(--ac); }
+.item.tracejado { background: transparent; border-style: dashed; }

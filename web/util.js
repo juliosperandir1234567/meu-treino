@@ -259,29 +259,61 @@ export function comemorar(titulo, sub = "") {
   setTimeout(() => el.remove(), 3600);
 }
 
-// ---------- desenho do corpo com os músculos da semana ----------
-// pct: { "Ombro": 0..1, "Peito": ..., "Braço", "Costas", "Pernas", "Abdômen" }
+/// ---------- desenho do corpo com os músculos da semana ----------
+// Contorno e músculos desenhados com curvas suaves; cada lado é espelhado.
+// pct: { "Ombro": 0..1, "Peito", "Braço", "Costas", "Pernas", "Abdômen" }
+function suave(p) {
+  // curva fechada passando pelos pontos (Catmull-Rom convertido em Bézier)
+  const n = p.length, f = (v) => Math.round(v * 10) / 10;
+  let d = `M${p[0][0]},${p[0][1]}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = p[(i - 1 + n) % n], p1 = p[i], p2 = p[(i + 1) % n], p3 = p[(i + 2) % n];
+    d += `C${f(p1[0] + (p2[0] - p0[0]) / 6)},${f(p1[1] + (p2[1] - p0[1]) / 6)} ${f(p2[0] - (p3[0] - p1[0]) / 6)},${f(p2[1] - (p3[1] - p1[1]) / 6)} ${p2[0]},${p2[1]}`;
+  }
+  return d + "Z";
+}
+// metade esquerda da figura (x de 0 a 80; o centro do corpo é x = 80)
+const CONTORNO = [[80, 50], [72, 52], [70, 60], [56, 64], [42, 69], [33, 78], [30, 96], [28, 120], [25, 142], [21, 166], [18, 186], [15, 200], [17, 213], [25, 216], [30, 203], [31, 188], [36, 166], [41, 144], [45, 122], [48, 108], [50, 126], [53, 150], [50, 168], [46, 196], [45, 232], [48, 258], [45, 282], [47, 308], [51, 330], [46, 342], [66, 346], [69, 334], [67, 318], [69, 292], [72, 262], [76, 222], [78, 196], [80, 192]];
+const FRENTE = [
+  ["Ombro", [[41, 70], [53, 66], [58, 74], [52, 92], [44, 104], [34, 99], [32, 84]]],
+  ["Peito", [[58, 73], [78, 75], [79, 101], [70, 107], [57, 105], [49, 97], [53, 83]]],
+  ["Braço", [[44, 106], [48, 112], [46, 132], [41, 142], [34, 139], [32, 120], [36, 105]]],
+  ["Braço", [[34, 145], [40, 147], [37, 168], [30, 186], [24, 185], [25, 166]], 0.55],
+  ["Abdômen", [[55, 109], [66, 111], [67, 150], [60, 162], [53, 142]]],
+  ["Abdômen", [[69, 109], [79, 109], [79, 123], [69, 123]]],
+  ["Abdômen", [[69, 126], [79, 126], [79, 140], [69, 140]]],
+  ["Abdômen", [[69, 143], [79, 143], [79, 158], [69, 158]]],
+  ["Abdômen", [[70, 161], [79, 161], [79, 182], [72, 176]]],
+  ["Pernas", [[53, 176], [66, 182], [75, 202], [73, 240], [64, 256], [54, 252], [48, 226], [48, 196]]],
+  ["Pernas", [[73, 200], [79, 198], [78, 228], [74, 234]], 0.7],
+  ["Pernas", [[51, 266], [60, 264], [64, 290], [60, 320], [55, 320], [49, 292]]],
+];
+const COSTAS = [
+  ["Costas", [[70, 55], [80, 53], [80, 106], [72, 94], [60, 74], [49, 67]]],
+  ["Ombro", [[41, 70], [51, 67], [56, 76], [50, 94], [43, 103], [34, 98], [32, 84]]],
+  ["Costas", [[53, 96], [68, 97], [79, 110], [79, 150], [66, 160], [56, 142], [50, 113]]],
+  ["Costas", [[68, 153], [79, 153], [79, 172], [69, 170]], 0.7],
+  ["Braço", [[36, 101], [46, 105], [47, 132], [41, 143], [33, 137], [31, 115]]],
+  ["Braço", [[34, 146], [40, 148], [37, 168], [30, 186], [24, 185], [25, 166]], 0.55],
+  ["Pernas", [[54, 168], [78, 172], [79, 199], [70, 207], [56, 205], [50, 187]]],
+  ["Pernas", [[52, 210], [76, 210], [74, 246], [64, 258], [54, 254], [48, 230]]],
+  ["Pernas", [[49, 264], [64, 263], [67, 290], [60, 308], [54, 308], [47, 287]]],
+];
 export function corpoSvg(pct = {}) {
-  const cor = (g) => {
-    const p = Math.max(0, Math.min(1, pct[g] || 0));
-    return p ? `fill="#C6F432" fill-opacity="${(0.22 + 0.78 * p).toFixed(2)}"` : `fill="#2A2E34"`;
+  const cor = (g, peso = 1) => {
+    const p = Math.max(0, Math.min(1, (pct[g] || 0) * peso));
+    return p ? `fill="#C6F432" fill-opacity="${(0.25 + 0.75 * p).toFixed(2)}"` : `fill="#3A3F47"`;
   };
-  const neutro = `fill="#202328"`;
-  const r = (x, y, w, hh, rx, g) => `<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="${rx}" ${g ? cor(g) : neutro}><title>${g || ""}</title></rect>`;
-  const c = (x, y, raio, g) => `<circle cx="${x}" cy="${y}" r="${raio}" ${g ? cor(g) : neutro}><title>${g || ""}</title></circle>`;
-  const figura = (cx, costas) => [
-    c(cx, 16, 11), c(cx - 25, 38, 9, "Ombro"), c(cx + 25, 38, 9, "Ombro"),
-    costas
-      ? r(cx - 20, 30, 40, 24, 7, "Costas") + r(cx - 18, 56, 36, 22, 7, "Costas") + r(cx - 12, 80, 24, 10, 4, "Costas")
-      : r(cx - 20, 31, 19, 21, 6, "Peito") + r(cx + 1, 31, 19, 21, 6, "Peito") + r(cx - 14, 55, 28, 35, 7, "Abdômen"),
-    r(cx - 39, 46, 11, 27, 5, "Braço"), r(cx + 28, 46, 11, 27, 5, "Braço"),
-    r(cx - 41, 76, 10, 26, 5), r(cx + 31, 76, 10, 26, 5),
-    costas ? r(cx - 18, 92, 17, 17, 7, "Pernas") + r(cx + 1, 92, 17, 17, 7, "Pernas") : r(cx - 18, 92, 36, 14, 6),
-    r(cx - 19, costas ? 111 : 108, 17, costas ? 40 : 43, 7, "Pernas"), r(cx + 2, costas ? 111 : 108, 17, costas ? 40 : 43, 7, "Pernas"),
-    r(cx - 17, 155, 13, 38, 6, "Pernas"), r(cx + 4, 155, 13, 38, 6, "Pernas"),
-    `<text x="${cx}" y="208" text-anchor="middle" font-size="11" font-family="Inter, Arial, sans-serif" fill="#9AA0A8">${costas ? "Costas" : "Frente"}</text>`,
-  ].join("");
-  return `<svg class="corpo" viewBox="0 0 220 214" role="img" aria-label="Músculos treinados na semana">${figura(58, false)}${figura(162, true)}</svg>`;
+  const contorno = suave(CONTORNO);
+  const figura = (x0, musc, rotulo) => {
+    const metade = musc.map(([g, pts, peso]) => `<path d="${suave(pts)}" ${cor(g, peso)}><title>${g}</title></path>`).join("");
+    return `<g transform="translate(${x0},0)">
+      <path d="${contorno}" fill="#24272C"/><path d="${contorno}" fill="#24272C" transform="translate(160,0) scale(-1,1)"/>
+      <ellipse cx="80" cy="29" rx="16" ry="20" fill="#24272C"/>
+      <g stroke="#0E0F11" stroke-width="1.6" stroke-linejoin="round">${metade}<g transform="translate(160,0) scale(-1,1)">${metade}</g></g>
+      <text x="80" y="368" text-anchor="middle" font-size="13" font-family="Inter, Arial, sans-serif" fill="#9AA0A8">${rotulo}</text></g>`;
+  };
+  return `<svg class="corpo" viewBox="0 0 340 374" role="img" aria-label="Músculos treinados na semana">${figura(4, FRENTE, "Frente")}${figura(176, COSTAS, "Costas")}</svg>`;
 }
 
 // ---------- barras: esta semana × semana passada (por dia) ----------

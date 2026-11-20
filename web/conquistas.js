@@ -158,7 +158,7 @@ export async function desenharSemana(d) {
   y += story ? 170 : 140;
 
   // corpo com os músculos e barras por dia
-  const corpoH = story ? 640 : 420, corpoW = corpoH * (220 / 214);
+  const corpoH = story ? 640 : 420, corpoW = corpoH * (340 / 374);
   try {
     const img = await imagemSvg(corpoSvg(pctGrupos(d.grupos)).replace('class="corpo"', `width="${corpoW}" height="${corpoH}"`));
     c.drawImage(img, story ? (W - corpoW) / 2 : M, y, corpoW, corpoH);
