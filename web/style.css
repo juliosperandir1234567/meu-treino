@@ -322,3 +322,11 @@ nav.nav a.at svg { background: rgba(37,99,235,.12); border-radius: 10px; padding
 /* colar texto do treino */
 .txt-ficha { min-height: 200px; resize: vertical; font: inherit; line-height: 1.5; padding: 12px; }
 .exemplo-txt { margin: 0; background: var(--s2); border-radius: 12px; padding: 10px 12px; font: 13px/1.55 ui-monospace, Menlo, Consolas, monospace; color: var(--mudo); white-space: pre-wrap; }
+
+/* tabela comparativa de avaliações */
+.tabela-rolar { overflow-x: auto; margin: 0 -4px; -webkit-overflow-scrolling: touch; }
+.comp-av { min-width: 100%; }
+.comp-av th, .comp-av td { white-space: nowrap; text-align: right; padding: 8px 6px; }
+.comp-av th:first-child, .comp-av td:first-child { text-align: left; white-space: normal; min-width: 130px; position: sticky; left: 0; background: var(--s1); }
+.comp-av tbody tr:nth-child(odd) td { background: var(--s2); }
+.comp-av th { text-transform: none; letter-spacing: 0; font-size: 12px; }

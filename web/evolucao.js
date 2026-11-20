@@ -3,7 +3,7 @@ import {
   sb, acoes, render, ir, h, toast, q, fmt, kg, dataCurta, inicioSemana, ico, botaoVoltar, nav, grafico,
   normal, metaReps, grupoDe, METAS, corpoSvg, barrasSemana,
 } from "./util.js";
-import { formAvaliacao, lerFormAvaliacao } from "./print.js";
+import { formAvaliacao, lerFormAvaliacao, tabelaComparativa } from "./print.js";
 import { volumeTxt } from "./treino.js";
 
 const achar = (med, ...chaves) => {
@@ -12,7 +12,7 @@ const achar = (med, ...chaves) => {
   return null;
 };
 function valorBraco(med) {
-  const ks = Object.keys(med || {}).filter((k) => normal(k).includes("braco"));
+  const ks = Object.keys(med || {}).filter((k) => normal(k).includes("braco") && !normal(k).includes("antebraco") && !normal(k).includes("dobra"));
   if (!ks.length) return null;
   const v = ks.map((k) => Number(med[k])).filter((x) => !isNaN(x));
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
@@ -96,21 +96,20 @@ export async function telaAvaliacao() {
     const chaves = [...new Set([...Object.keys(ult.medidas || {}), ...Object.keys(ant?.medidas || {})])];
     const prox = avs.find((a) => a.proxima)?.proxima;
     const dias = prox ? Math.ceil((new Date(prox + "T12:00") - new Date()) / 864e5) : null;
-    const comp = (rot, campo, un, bomSubir) => `<div class="stat"><span class="mini mudo">${rot}</span><span class="v">${ult[campo] != null ? fmt(ult[campo]) + un : "—"}</span>${delta(ult[campo], ant?.[campo], bomSubir, un ? " " + un.trim() : "")}</div>`;
+    const comp = (rot, campo, un, bomSubir) => `<div class="stat"><span class="mini mudo">${rot}</span><span class="v">${ult[campo] != null ? String(Math.round(ult[campo] * 100) / 100).replace(".", ",") + un : "—"}</span>${delta(ult[campo], ant?.[campo], bomSubir, un ? " " + un.trim() : "")}</div>`;
     const bomSubir = (k) => !/cintura|abdomen|quadril/.test(normal(k));
     corpo = `
       <div class="grade2">${comp("Peso", "peso", " kg", false)}${comp("Gordura", "gordura", " %", false)}${comp("Massa magra", "massa_magra", " kg", true)}${comp("IMC", "imc", "", false)}</div>
-      ${chaves.length ? `<div class="cartao"><table class="tabela"><thead><tr><th>Medida (cm)</th><th>${ant ? dataCurta(ant.data + "T12:00") : "Antes"}</th><th>${dataCurta(ult.data + "T12:00")}</th><th>Dif.</th></tr></thead><tbody>
-        ${chaves.map((k) => { const a = ant?.medidas?.[k], b = ult.medidas?.[k]; return `<tr><td>${h(k)}</td><td class="mudo">${fmt(a)}</td><td><b>${fmt(b)}</b></td><td>${a != null && b != null ? delta(b, a, bomSubir(k)) : "—"}</td></tr>`; }).join("")}
-      </tbody></table></div>` : ""}
+      ${chaves.length || avs.length > 1 ? `<div class="cartao"><div class="entre"><b>Comparativo</b><span class="mini mudo">${avs.length} avaliaç${avs.length > 1 ? "ões" : "ão"}</span></div>
+        ${tabelaComparativa([...avs].reverse().slice(-6))}</div>` : ""}
       ${dias != null ? `<div class="cartao tracejado"><div class="linha"><span class="ac">${ico("calendario", 22)}</span><div class="col" style="gap:2px">
         <b>${dias > 0 ? `Próxima avaliação em ${dias} dia${dias > 1 ? "s" : ""}` : dias === 0 ? "Avaliação é hoje" : "Avaliação atrasada"}</b><span class="mini mudo">${new Date(prox + "T12:00").toLocaleDateString("pt-BR")}</span></div></div></div>` : ""}
-      <div class="col"><span class="rot">Histórico</span>${avs.map((a) => `<div class="item"><span class="col" style="flex:1;gap:2px"><b>${new Date(a.data + "T12:00").toLocaleDateString("pt-BR")}</b>
-        <span class="mini mudo">${{ print: "Da academia (print)", casa: "Medida em casa", manual: "Lançada à mão" }[a.origem] || a.origem}${a.peso ? " · " + kg(a.peso) : ""}</span></span>
+      <div class="col"><span class="rot">Histórico</span>${avs.map((a) => `<div class="item"><span class="col" style="flex:1;gap:2px"><b>${a.rotulo ? h(a.rotulo) + " · " : ""}${new Date(a.data + "T12:00").toLocaleDateString("pt-BR")}</b>
+        <span class="mini mudo">${{ print: "Da academia (print)", texto: "Colada em texto", casa: "Medida em casa", manual: "Lançada à mão" }[a.origem] || a.origem}${a.peso ? " · " + kg(a.peso) : ""}</span></span>
         <button class="ico" style="width:36px;height:36px" data-acao="apagarAv" data-id="${a.id}" aria-label="Apagar avaliação">${ico("lixo", 16)}</button></div>`).join("")}</div>`;
   }
   render(`<section class="tela">
-    <div class="topo"><div class="tit"><h1>Avaliação física</h1>${ult ? `<span class="mini mudo">${new Date(ult.data + "T12:00").toLocaleDateString("pt-BR")} · ${ult.origem === "print" ? "importada por print" : ult.origem === "casa" ? "medida em casa" : "lançada à mão"}</span>` : ""}</div></div>
+    <div class="topo"><div class="tit"><h1>Avaliação física</h1>${ult ? `<span class="mini mudo">${new Date(ult.data + "T12:00").toLocaleDateString("pt-BR")} · ${ult.origem === "print" ? "importada por print" : ult.origem === "texto" ? "colada em texto" : ult.origem === "casa" ? "medida em casa" : "lançada à mão"}</span>` : ""}</div></div>
     ${corpo}
     ${ult ? `<div class="grade2"><a class="btn" href="#/medir">${ico("mais", 18)} Medir em casa</a><a class="btn pri" href="#/print?tipo=avaliacao">${ico("lista", 18)} Nova (texto ou print)</a></div>` : ""}
   </section>${nav("#/avaliacao")}`);

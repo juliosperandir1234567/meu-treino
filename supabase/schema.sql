@@ -287,3 +287,7 @@ create extension if not exists pg_cron;
 --   select net.http_post(url := 'https://<PROJETO>.supabase.co/functions/v1/lembretes',
 --     headers := jsonb_build_object('Content-Type','application/json','x-cron',(select token_cron from public.push_config where id=1)),
 --     body := '{}'::jsonb, timeout_milliseconds := 60000); $$);
+
+-- ---------- Avaliação colada em texto: ordem das linhas e nome da coluna, como vieram ----------
+alter table public.avaliacoes add column if not exists ordem text[];
+alter table public.avaliacoes add column if not exists rotulo text;

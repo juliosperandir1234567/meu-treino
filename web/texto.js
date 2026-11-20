@@ -83,45 +83,84 @@ export function lerTexto(texto, qual = "") {
 }
 
 // ---------- avaliação física em texto ----------
-// Lê peso, IMC, % de gordura, massa magra, data e as circunferências (cm).
-// Dobras cutâneas (mm) não entram nas medidas: o % de gordura já resume elas.
-const PARTE_CORPO = /(t[óo]rax|peito|bra[çc]o|antebra[çc]o|cintura|abd[ôo]men|quadril|coxa|panturrilha|ombro|pesco[çc]o|escapular|gl[úu]teo)/i;
-const NUM_AV = String.raw`(\d+(?:[.,]\d+)?)`;
-function valorDe(texto, rotulo) {
-  const m = texto.match(new RegExp(rotulo + String.raw`[^\d\n]*?` + NUM_AV, "i"));
-  return m ? numero(m[1]) : null;
-}
-function nomeMedida(n) {
-  let s = n.replace(/\s+/g, " ").trim().replace(/[:\-–]+$/, "").trim();
-  s = s.replace(/^t[óo]rax$/i, "Peito").replace(/\s+relaxado$/i, "");
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-export function lerAvaliacaoTexto(texto) {
-  const t = String(texto || "").replace(/\r/g, "");
-  const res = { data: null, peso: null, gordura: null, massa_magra: null, imc: null, medidas: {} };
-  res.peso = valorDe(t, String.raw`\bpeso(?!\s*e\s*altura)`);
-  res.imc = valorDe(t, String.raw`\bimc\b`);
-  res.gordura = valorDe(t, String.raw`(?:percentual\s+de\s+gordura|%\s*(?:de\s*)?gordura|gordura\s*(?:corporal)?\s*\(?%?\)?)`);
-  res.massa_magra = valorDe(t, String.raw`massa\s+magra`);
-  const altura = valorDe(t, String.raw`\baltura\b`);
-  if (!res.imc && res.peso && altura) { const a = altura > 3 ? altura / 100 : altura; res.imc = Math.round((res.peso / (a * a)) * 10) / 10; }
-  if (!res.massa_magra && res.peso && res.gordura) res.massa_magra = Math.round(res.peso * (1 - res.gordura / 100) * 10) / 10;
-  const d = t.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  if (d) res.data = `${d[3]}-${d[2]}-${d[1]}`;
+// Os nomes das medidas ficam EXATAMENTE como vieram no texto (ex.: "Tórax (cm)", "Dobra tricipital (mm)"),
+// na mesma ordem. Valores "Não informado" ou zerados ficam de fora.
+// Aceita uma tabela comparativa (Medida; Janeiro/2026; Maio/2026; ...) → uma avaliação por coluna,
+// ou uma avaliação só ("Peso 79,20 kg", "Cintura 88,00 ...").
 
-  let secao = "";
-  for (const bruta of t.split("\n")) {
-    const l = bruta.trim();
-    if (!l) continue;
-    if (/dobras?|skinfold/i.test(l) && !/\d/.test(l.replace(/\d+\s*dobras/i, ""))) { secao = "dobras"; continue; }
-    if (/circunfer|per[íi]metro|medidas/i.test(l) && !/\d/.test(l)) { secao = "medidas"; continue; }
-    if (/^(peso|composi|bioimped)/i.test(l) && !/\d/.test(l)) { secao = "geral"; continue; }
-    if (secao === "dobras") continue;
-    const m = l.match(new RegExp(String.raw`^([^\d]+?)[\s:|\t]+` + NUM_AV));
-    if (!m || !PARTE_CORPO.test(m[1])) continue;
-    const v = numero(m[2]);
-    if (!v) continue;   // valor zerado = não medido
-    res.medidas[nomeMedida(m[1])] = v;
+const MESES = { jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12 };
+const dois = (n) => String(n).padStart(2, "0");
+// "Janeiro/2026", "mai/2026", "13/11/2026", "11/2026", "2026-05-10" → "AAAA-MM-DD"
+export function dataDeRotulo(x) {
+  const t = String(x || "").trim().toLowerCase();
+  let m = t.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return `${m[3]}-${dois(m[2])}-${dois(m[1])}`;
+  m = t.match(/(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/);
+  if (m) return `${m[1]}-${dois(m[2])}-${dois(m[3] || 1)}`;
+  m = t.match(/([a-zç]{3,})\.?\s*(?:\/|de|-)?\s*(\d{4})/);
+  if (m && MESES[m[1].slice(0, 3)]) return `${m[2]}-${dois(MESES[m[1].slice(0, 3)])}-01`;
+  m = t.match(/^(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[2]}-${dois(m[1])}-01`;
+  return null;
+}
+const naoInformado = (c) => /n[ãa]o\s+informad|^[-—–]?$|^n\/?a$/i.test(String(c).trim());
+function valorCelula(c) {
+  if (naoInformado(c)) return null;
+  const m = String(c).match(/-?\d+(?:[.,]\d+)?/);
+  if (!m) return null;
+  const v = numero(m[0]);
+  return v ? v : null;   // zero = não medido
+}
+// rótulo → campo principal (para os gráficos); a linha continua nas medidas com o nome original
+export function campoDe(rotulo) {
+  const n = rotulo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/dobra/.test(n)) return null;
+  if (/^peso\b/.test(n)) return "peso";
+  if (/^imc\b/.test(n)) return "imc";
+  if (/massa\s+magra/.test(n)) return "massa_magra";
+  if (/gordura/.test(n)) return "gordura";
+  return null;
+}
+function novaAv(rotulo, data) { return { rotulo, data, peso: null, gordura: null, massa_magra: null, imc: null, medidas: {}, ordem: [] }; }
+function guardar(av, rotulo, v) {
+  if (v == null) return;
+  if (!av.medidas[rotulo] && !av.ordem.includes(rotulo)) av.ordem.push(rotulo);
+  av.medidas[rotulo] = v;
+  const c = campoDe(rotulo);
+  if (c && av[c] == null) av[c] = v;
+}
+
+export function lerAvaliacoesTexto(texto) {
+  const linhas = String(texto || "").replace(/\r/g, "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const sepDe = (l) => (l.includes(";") ? ";" : l.includes("\t") ? "\t" : l.includes("|") ? "|" : null);
+  const cels = (l, s) => { const c = l.split(s).map((x) => x.trim()); return s === "|" ? c.filter((x, i) => !((i === 0 || i === c.length - 1) && !x)) : c; };
+
+  // tabela comparativa: cabeçalho com colunas que são datas/meses
+  const hi = linhas.findIndex((l) => { const s = sepDe(l); if (!s) return false; const c = cels(l, s); return c.length >= 2 && c.slice(1).some((x) => dataDeRotulo(x)); });
+  if (hi >= 0) {
+    const s = sepDe(linhas[hi]);
+    const cab = cels(linhas[hi], s).slice(1);
+    const avs = cab.map((r) => novaAv(r, dataDeRotulo(r)));
+    for (const l of linhas.slice(hi + 1)) {
+      if (sepDe(l) !== s) { if (/^observa/i.test(l)) break; continue; }
+      const c = cels(l, s);
+      const rotulo = c[0];
+      if (!rotulo || !/[a-zà-ú]/i.test(rotulo)) continue;
+      avs.forEach((av, j) => guardar(av, rotulo, valorCelula(c[j + 1] ?? "")));
+    }
+    return avs.filter((av) => av.ordem.length);
   }
-  return res;
+
+  // uma avaliação só: "Rótulo<tab ou ; ou :>valor ..." (pega o primeiro número da linha)
+  const av = novaAv(null, null);
+  for (const l of linhas) {
+    const d = l.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (d && !av.data) { av.data = `${d[3]}-${d[2]}-${d[1]}`; av.rotulo = `${d[1]}/${d[2]}/${d[3]}`; }
+    const m = l.match(/^([^\d\t;:|]*[a-zà-ú][^\d\t;:|]*?)\s*(?:[\t;:|]+|\s+)\s*(-?\d+(?:[.,]\d+)?)/i);
+    if (!m) continue;
+    const rotulo = m[1].trim();
+    if (/^(protocolo|data|classifica|dobra\s+valor|dado|regi[ãa]o)/i.test(rotulo)) continue;
+    guardar(av, rotulo, valorCelula(m[2]));
+  }
+  return av.ordem.length ? [av] : [];
 }

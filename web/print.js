@@ -3,7 +3,7 @@ import {
   sb, acoes, mudancas, render, ir, h, toast, q, num, kg, normal, ico, botaoVoltar,
   reduzir, blobBase64, enviarFoto, carregarImagem,
 } from "./util.js";
-import { lerTexto, lerAvaliacaoTexto } from "./texto.js";
+import { lerTexto, lerAvaliacoesTexto, campoDe } from "./texto.js";
 
 let P = { tipo: "texto", texto: "", qual: "", imgs: [], lendo: false, res: null, destino: null, novaLetra: "", novaNome: "", marc: {}, fichas: [] };
 
@@ -57,10 +57,70 @@ mudancas.qualTreino = (el) => { P.qual = el.value.trim(); };
 acoes.lerTextoAv = () => {
   P.textoAv = document.getElementById("txtAv")?.value || "";
   if (!P.textoAv.trim()) return toast("Cole o texto da avaliação primeiro");
-  const r = lerAvaliacaoTexto(P.textoAv);
-  if (r.peso == null && r.gordura == null && !Object.keys(r.medidas).length) return toast("Não achei peso, gordura nem medidas nesse texto", 4500);
-  P.res = r; desenharAvaliacao();
+  const avs = lerAvaliacoesTexto(P.textoAv);
+  if (!avs.length) return toast("Não achei medidas nesse texto. Use uma medida por linha, ex.: Cintura (cm); 88", 5000);
+  P.avsTexto = avs; desenharAvsTexto();
 };
+function desenharAvsTexto() {
+  const avs = P.avsTexto, n = avs.length;
+  const semData = avs.some((a) => !a.data);
+  render(`<section class="tela">
+    <div class="topo"><button class="ico" data-acao="voltarAvTexto" aria-label="Voltar">${ico("voltar")}</button><div class="tit"><h2>Conferir avaliação${n > 1 ? "ões" : ""}</h2>
+      <span class="mini mudo">${n} avaliaç${n > 1 ? "ões" : "ão"} · os nomes ficam iguais ao texto</span></div></div>
+    <div class="cartao"><b>Data de cada avaliação</b>
+      ${semData ? `<span class="peq lar">Coloque a data das avaliações que estão sem.</span>` : `<span class="mini mudo">Quando o texto só tem mês e ano, usei o dia 1. Pode ajustar.</span>`}
+      <div class="col" style="gap:8px">${avs.map((a, i) => `<label class="grade2" style="grid-template-columns:1fr 160px;align-items:center"><b class="peq">${h(a.rotulo || "Avaliação " + (i + 1))}</b>
+        <input class="inp" type="date" value="${h(a.data || "")}" data-muda="dataAvTexto" data-i="${i}"></label>`).join("")}</div></div>
+    <div class="cartao">${tabelaComparativa(avs, { dif: false })}</div>
+  </section>
+  <div class="rodape"><div><button class="btn pri" data-acao="salvarAvsTexto">Salvar ${n > 1 ? n + " avaliações" : "avaliação"}</button></div></div>`);
+}
+acoes.voltarAvTexto = () => { P.avsTexto = null; desenharEscolha(); };
+mudancas.dataAvTexto = (el) => { P.avsTexto[Number(el.dataset.i)].data = el.value || null; };
+acoes.salvarAvsTexto = async (el) => {
+  const avs = P.avsTexto;
+  if (avs.some((a) => !a.data)) return toast("Coloque a data de todas as avaliações");
+  el.disabled = true; el.innerHTML = '<span class="girando"></span> Salvando…';
+  try {
+    const ja = q(await sb.from("avaliacoes").select("id, data").in("data", avs.map((a) => a.data)));
+    for (const a of avs) {
+      const linha = { data: a.data, rotulo: a.rotulo, ordem: a.ordem, medidas: a.medidas, peso: a.peso, gordura: a.gordura, massa_magra: a.massa_magra, imc: a.imc, origem: "texto" };
+      const existe = ja.find((x) => x.data === a.data);   // mesma data: substitui (colar de novo não duplica)
+      if (existe) q(await sb.from("avaliacoes").update(linha).eq("id", existe.id));
+      else q(await sb.from("avaliacoes").insert(linha));
+    }
+    P = { ...P, avsTexto: null, textoAv: "" };
+    toast(avs.length > 1 ? `${avs.length} avaliações salvas` : "Avaliação salva"); ir("#/avaliacao");
+  } catch (e) { toast("Erro ao salvar: " + e.message, 5000); el.disabled = false; el.textContent = "Tentar de novo"; }
+};
+
+// ---------- tabela comparativa (mesma ordem e nomes do texto) ----------
+const EXTRAS = [["peso", "Peso (kg)"], ["gordura", "Gordura corporal (%)"], ["massa_magra", "Massa magra (kg)"], ["imc", "IMC"]];
+const numBR = (v) => (v == null ? "—" : String(Math.round(Number(v) * 100) / 100).replace(".", ","));
+const bomDescer = (k) => /cintura|abdomen|abdominal|quadril|peso|gordura|imc|dobra/.test(normal(k));
+const neutro = (k) => /altura/.test(normal(k));
+export function tabelaComparativa(avs, { dif = true } = {}) {
+  const base = [...avs].sort((a, b) => (b.ordem?.length || 0) - (a.ordem?.length || 0));
+  const linhas = [];
+  base.forEach((a) => (a.ordem?.length ? a.ordem : Object.keys(a.medidas || {})).forEach((k) => { if (!linhas.includes(k)) linhas.push(k); }));
+  const extras = EXTRAS.filter(([c]) => !linhas.some((k) => campoDe(k) === c) && avs.some((a) => a[c] != null));
+  const valor = (a, k) => a.medidas?.[k] ?? a[extras.find(([, r]) => r === k)?.[0]] ?? null;
+  const todas = [...extras.map(([, r]) => r), ...linhas];
+  const cab = (a) => h(a.rotulo || new Date(a.data + "T12:00").toLocaleDateString("pt-BR"));
+  return `<div class="tabela-rolar"><table class="tabela comp-av"><thead><tr><th>Medida</th>${avs.map((a) => `<th>${cab(a)}</th>`).join("")}${dif && avs.length > 1 ? "<th>Dif.</th>" : ""}</tr></thead><tbody>
+    ${todas.map((k) => {
+      const vs = avs.map((a) => valor(a, k));
+      let d = "";
+      if (dif && avs.length > 1) {
+        const ult = vs[vs.length - 1], ant = [...vs.slice(0, -1)].reverse().find((x) => x != null);
+        if (ult == null || ant == null) d = '<td class="mudo">—</td>';
+        else { const x = Math.round((ult - ant) * 100) / 100; const cor = !x || neutro(k) ? "mudo" : (x < 0) === bomDescer(k) ? "ac" : "lar";
+          d = `<td class="${cor}" style="font-weight:600">${x > 0 ? "+" : x < 0 ? "−" : ""}${x ? numBR(Math.abs(x)) : "igual"}</td>`; }
+      }
+      return `<tr><td>${h(k)}</td>${vs.map((v, i) => `<td class="${i === vs.length - 1 ? "" : "mudo"}">${i === vs.length - 1 && v != null ? `<b>${numBR(v)}</b>` : numBR(v)}</td>`).join("")}${d}</tr>`;
+    }).join("")}
+  </tbody></table></div>`;
+}
 acoes.lerTextoFicha = async () => {
   P.texto = document.getElementById("txtFicha")?.value || "";
   if (!P.texto.trim()) return toast("Cole o texto do treino primeiro");
