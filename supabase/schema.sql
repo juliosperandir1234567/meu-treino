@@ -201,3 +201,16 @@ language sql volatile security definer set search_path = '' as $$
 $$;
 revoke execute on function public.definir_meu_nome(text) from public, anon;
 grant execute on function public.definir_meu_nome(text) to authenticated;
+
+-- ---------- "Como fazer" de cada exercício: gerado por IA uma vez e reaproveitado por todos ----------
+create table if not exists public.dicas_exercicio (
+  chave text primary key,            -- nome normalizado (sem acento, minúsculo)
+  nome text not null,
+  conteudo jsonb not null,
+  criado_em timestamptz not null default now()
+);
+alter table public.dicas_exercicio enable row level security;
+drop policy if exists "ler dicas" on public.dicas_exercicio;
+create policy "ler dicas" on public.dicas_exercicio for select to authenticated using ((select public.conta_ativa()));
+grant select on public.dicas_exercicio to authenticated;
+grant select, insert, update, delete on public.dicas_exercicio to service_role;

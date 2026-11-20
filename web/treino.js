@@ -2,7 +2,7 @@
 import {
   sb, acoes, mudancas, limpeza, render, renderSemRolar, ir, h, toast, q, num, fmt, kg, hora, mmss, duracao,
   metaReps, ico, botaoVoltar, treinoAtivo, salvarTreinoAtivo, fotoUrl, fotoUrls, reduzir, enviarFoto, escolherFoto,
-  carregarImagem, bip, destravarAudio, manterTelaLigada, comemorar,
+  carregarImagem, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha,
 } from "./util.js";
 
 let D = null; // dados do treino carregados
@@ -27,7 +27,8 @@ async function carregar(t) {
   const eqs = ids.length ? q(await sb.from("equipamentos").select("*").in("exercicio_id", ids)) : [];
   const feitas = q(await sb.from("series_feitas").select("*").eq("sessao_id", t.sessaoId).order("feita_em"));
   const hist = ids.length ? q(await sb.from("series_feitas").select("*").in("exercicio_id", ids).neq("sessao_id", t.sessaoId).order("feita_em", { ascending: false }).limit(600)) : [];
-  D = { sessaoId: t.sessaoId, s, exs, eqs, feitas, hist, avisos: [], avisouAcima: {} };
+  const urls = await fotoUrls(eqs.map((e) => e.foto_path));
+  D = { sessaoId: t.sessaoId, s, exs, eqs, feitas, hist, urls, avisos: [], avisouAcima: {} };
 }
 
 // séries da última vez (mesmo exercício e mesma opção de equipamento)
@@ -78,6 +79,7 @@ function desenharTreino(rolar = false) {
   const opcao = t.opcoes[ex.id] || 1;
   const eq = D.eqs.find((e) => e.exercicio_id === ex.id && e.opcao === opcao);
   const qtdOpc = D.eqs.filter((e) => e.exercicio_id === ex.id).length;
+  const fotoEq = eq?.foto_path ? D.urls?.[eq.foto_path] : null;
   const feitas = D.feitas.filter((x) => x.exercicio_id === ex.id);
   const uv = ultimaVez(ex.id, opcao);
   const meta = metaReps(ex.reps);
@@ -127,14 +129,19 @@ function desenharTreino(rolar = false) {
   const html = `<section class="tela">
     <div class="topo">${botaoVoltar("#/hoje")}<div class="tit" style="align-items:center"><b class="num" style="font-size:17px">${h(t.fichaNome)}</b>
       <span class="peq mudo">Início ${hora(D.s.inicio)} · <span id="decorrido">${mmss((Date.now() - new Date(D.s.inicio)) / 1000)}</span> de treino</span></div><span style="width:44px"></span></div>
-    <div class="col" style="gap:6px"><div class="entre mini mudo"><span>Exercício ${t.idx + 1} de ${n}</span><span>${pct}%</span></div><div class="barra"><div style="width:${pct}%"></div></div></div>
+    <div class="col" style="gap:6px"><div class="entre mini mudo"><span>Exercício ${t.idx + 1} de ${n} · ${pct}% feito</span>
+      <button class="btn peq" style="min-height:32px" data-acao="listaExs">${ico("lista", 15)} Ver todos</button></div><div class="barra"><div style="width:${pct}%"></div></div></div>
     <div class="exs">${D.exs.map((e, i) => `<button data-acao="irEx" data-i="${i}" class="${i === t.idx ? "at" : exsFeitos.has(e.id) ? "fe" : ""}" aria-label="${h(e.nome)}">${i + 1}</button>`).join("")}</div>
     ${avisos}
     <div class="cartao">
-      <div class="col" style="gap:4px"><h2>${h(ex.nome)}</h2>
+      <div class="linha" style="align-items:flex-start;gap:12px">
+        ${fotoEq ? `<button class="eq-mini" data-acao="verFoto" data-src="${h(fotoEq)}" data-tit="${h(eq?.nome || ex.nome)}" aria-label="Ver foto do equipamento"><img src="${h(fotoEq)}" alt=""><span>${ico("mais", 12)}</span></button>` : ""}
+        <div class="col" style="gap:4px;min-width:0;flex:1"><h2>${h(ex.nome)}</h2>
         <span class="peq mudo">${ex.series} séries · ${h(ex.reps)} repetições${ex.carga_prevista ? " · ficha " + kg(ex.carga_prevista) : ""} · descanso ${mmss(ex.descanso_seg)}</span>
-        ${ex.obs ? `<span class="peq ac">${h(ex.obs)}</span>` : ""}
-        <a href="#/equip/${ex.id}" class="btn peq" style="align-self:flex-start;margin-top:6px">${ico("imagem", 16)} Equipamento: ${eq?.nome ? h(eq.nome) : "opção " + opcao}${qtdOpc > 1 ? ` (${opcao} de ${qtdOpc})` : ""} · trocar</a></div>
+        ${ex.obs ? `<span class="peq ac">${h(ex.obs)}</span>` : ""}</div></div>
+      <div class="grade2">
+        <a href="#/equip/${ex.id}" class="btn peq">${ico("imagem", 16)} ${eq?.nome ? h(eq.nome.slice(0, 16)) : "Equipamento"}${qtdOpc > 1 ? ` · ${opcao}/${qtdOpc}` : ""}</a>
+        <button class="btn peq" data-acao="comoFazer" data-nome="${h(ex.nome)}">${ico("play", 15)} Como fazer</button></div>
       <div class="series"><div class="serie cab"><span>Série</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${linhas.join("")}</div>
       <div class="entre"><button class="btn peq" data-acao="maisSerie">${ico("mais", 16)} Série extra</button>
         ${descansos.length ? `<span class="mini mudo" style="text-align:right">Descansos: ${descansos.join(" · ")}</span>` : ""}</div>
@@ -150,6 +157,57 @@ function desenharTreino(rolar = false) {
   rolar ? render(html) : renderSemRolar(html);
 }
 
+// lista de todos os exercícios para pular para qualquer um
+acoes.listaExs = () => {
+  const t = treinoAtivo();
+  const itens = D.exs.map((e, i) => {
+    const op = t.opcoes[e.id] || 1;
+    const eqx = D.eqs.find((x) => x.exercicio_id === e.id && x.opcao === op) || D.eqs.find((x) => x.exercicio_id === e.id && x.foto_path);
+    const foto = eqx?.foto_path ? D.urls?.[eqx.foto_path] : null;
+    const feitas = D.feitas.filter((x) => x.exercicio_id === e.id).length;
+    const ok = feitas >= e.series;
+    return `<button class="item lista-ex ${i === t.idx ? "at" : ""}" data-acao="irExLista" data-i="${i}">
+      <span class="lista-ft">${foto ? `<img src="${h(foto)}" alt="">` : `<b>${i + 1}</b>`}</span>
+      <span class="col" style="flex:1;gap:2px;min-width:0"><b>${h(e.nome)}</b><span class="mini mudo">${e.series} × ${h(e.reps)}${eqx?.nome ? " · " + h(eqx.nome) : ""}</span></span>
+      <span class="chip ${ok ? "cheio" : feitas ? "ac" : ""}">${ok ? "✓ feito" : `${feitas}/${e.series}`}</span></button>`;
+  }).join("");
+  abrirFolha(`<div class="entre"><h2>Exercícios do treino</h2><button class="ico" data-acao="fecharFolha" aria-label="Fechar">✕</button></div>
+    <p class="mini mudo" style="margin:0">Toque para ir direto a qualquer exercício.</p><div class="col" style="gap:8px">${itens}</div>`, "Exercícios do treino");
+};
+acoes.irExLista = (el) => { fecharFolha(); acoes.irEx(el); };
+acoes.verFoto = (el) => {
+  abrirFolha(`<div class="entre"><h2>${h(el.dataset.tit || "Equipamento")}</h2><button class="ico" data-acao="fecharFolha" aria-label="Fechar">✕</button></div>
+    <img class="foto-cheia" src="${h(el.dataset.src)}" alt="Foto do equipamento">`, "Foto do equipamento");
+};
+// como fazer: explicação por IA (guardada para todos) + vídeos reais no YouTube
+const dicasCache = {};
+acoes.comoFazer = async (el) => {
+  const nome = el.dataset.nome;
+  const yt = `https://www.youtube.com/results?search_query=${encodeURIComponent(nome + " execução correta academia")}`;
+  const corpo = abrirFolha(`<div class="entre"><h2>${h(nome)}</h2><button class="ico" data-acao="fecharFolha" aria-label="Fechar">✕</button></div>
+    <a class="btn pri blk" href="${yt}" target="_blank" rel="noopener">${ico("play", 18)} Ver vídeos de como fazer</a>
+    <div id="dicas" class="col" style="gap:12px"><div class="cartao"><span class="mudo peq">Preparando a explicação…</span><div class="barra"><div class="carregando-barra"></div></div></div></div>`, "Como fazer");
+  const alvo = corpo.querySelector("#dicas");
+  try {
+    let r = dicasCache[nome];
+    if (!r) {
+      const { data, error } = await sb.functions.invoke("como-fazer", { body: { nome } });
+      if (error) { let m = "Não consegui carregar a explicação"; try { m = (await error.context.json()).erro || m; } catch { /* */ } throw new Error(m); }
+      r = dicasCache[nome] = data.resultado;
+    }
+    if (!document.body.contains(alvo)) return;
+    if (r.desconhecido) { alvo.innerHTML = `<div class="cartao"><span class="peq mudo">Não reconheci esse nome de exercício. Use os vídeos acima.</span></div>`; return; }
+    const lista = (xs, cls) => (xs || []).map((x, i) => `<li class="${cls}"><span>${cls === "passo" ? i + 1 : "✕"}</span><p>${h(x)}</p></li>`).join("");
+    alvo.innerHTML = `
+      ${r.musculos?.length ? `<div class="linha" style="gap:6px;flex-wrap:wrap">${r.musculos.map((m) => `<span class="chip ac">${h(m)}</span>`).join("")}</div>` : ""}
+      <div class="cartao"><b>Passo a passo</b><ol class="passos">${lista(r.passos, "passo")}</ol></div>
+      ${r.erros?.length ? `<div class="cartao"><b>Evite</b><ul class="passos">${lista(r.erros, "erro")}</ul></div>` : ""}
+      ${r.dica ? `<div class="cartao ac-borda"><div class="linha" style="align-items:flex-start"><span class="ac">${ico("info", 18)}</span><span class="peq">${h(r.dica)}</span></div></div>` : ""}
+      <span class="mini mudo">Explicação gerada por IA. Na dúvida, peça ajuda ao professor da academia.</span>`;
+  } catch (e) {
+    if (document.body.contains(alvo)) alvo.innerHTML = `<div class="cartao"><span class="peq lar">${h(e.message || "Não consegui carregar a explicação")}</span><span class="mini mudo">Os vídeos acima continuam funcionando.</span></div>`;
+  }
+};
 acoes.irEx = (el) => { const t = treinoAtivo(); t.idx = Number(el.dataset.i); salvarTreinoAtivo(t); desenharTreino(true); };
 acoes.maisSerie = async () => {
   const t = treinoAtivo(); const ex = D.exs[t.idx];
@@ -279,6 +337,7 @@ acoes.usarEquip = (el) => {
 async function salvarEquip(exId, opcao, campos) {
   const r = q(await sb.from("equipamentos").upsert({ exercicio_id: exId, opcao, ...campos }, { onConflict: "exercicio_id,opcao" }).select().single());
   if (D) { D.eqs = D.eqs.filter((e) => !(e.exercicio_id === exId && e.opcao === opcao)); D.eqs.push(r); }
+  if (D && r.foto_path) D.urls = { ...(D.urls || {}), ...(await fotoUrls([r.foto_path])) };
   return r;
 }
 mudancas.campoEquip = async (el) => {

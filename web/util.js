@@ -27,6 +27,7 @@ export function mostrarGuardada() {
 }
 export function esquecerTelas() { guardadas.clear(); mostrandoGuardada = null; }
 export function render(html) {
+  if (document.getElementById("folha")) fecharFolha();
   const k = chaveTela(), antes = guardadas.get(k);
   if (ABAS.has(k.split("?")[0])) guardadas.set(k, html);
   app().classList.remove("trocando");
@@ -172,6 +173,7 @@ const P = {
   lixo: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
   chave: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3M17 6l3 3M14 9l2 2"/>',
+  lista: '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
   sair: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
 };
 export function ico(nome, tam = 20, extra = "") {
@@ -330,3 +332,19 @@ export function barrasSemana(atual, passada, rotulos) {
   return `<svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Volume por dia, esta semana e a anterior">
     <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#2A2E34"/>${cols}</svg>`;
 }
+
+// ---------- folha que sobe de baixo (lista, foto, explicação) ----------
+export function abrirFolha(html, rotulo = "") {
+  fecharFolha();
+  const el = document.createElement("div");
+  el.id = "folha"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); if (rotulo) el.setAttribute("aria-label", rotulo);
+  el.innerHTML = `<div class="folha-fundo" data-acao="fecharFolha"></div><div class="folha-caixa"><div class="folha-alca"></div><div class="folha-corpo">${html}</div></div>`;
+  document.body.appendChild(el);
+  document.body.style.overflow = "hidden";
+  return el.querySelector(".folha-corpo");
+}
+export function fecharFolha() {
+  document.getElementById("folha")?.remove();
+  document.body.style.overflow = "";
+}
+acoes.fecharFolha = () => fecharFolha();
