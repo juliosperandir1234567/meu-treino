@@ -133,3 +133,37 @@ svg.graf { width: 100%; height: 140px; display: block; }
 canvas.prev { width: 100%; max-width: 280px; border-radius: 16px; align-self: center; box-shadow: 0 12px 32px rgba(0,0,0,.6); }
 .girando { width: 22px; height: 22px; border: 3px solid var(--s2); border-top-color: var(--ac); border-radius: 50%; animation: gira 0.8s linear infinite; }
 @keyframes gira { to { transform: rotate(360deg); } }
+
+/* comemoração */
+#festa { position: fixed; inset: 0; z-index: 90; overflow: hidden; display: grid; place-items: center; background: rgba(14,15,17,.45); animation: festaIn .2s ease-out; }
+#festa i { position: absolute; top: -20px; width: 9px; height: 14px; border-radius: 2px; animation-name: cair; animation-timing-function: cubic-bezier(.3,.6,.5,1); animation-fill-mode: forwards; }
+@keyframes cair { to { top: 105%; transform: rotate(720deg) translateX(30px); } }
+@keyframes festaIn { from { opacity: 0; } }
+.festa-card { position: relative; background: var(--s1); border: 1px solid var(--ac); border-radius: 20px; padding: 22px 26px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; max-width: 300px; animation: pulo .45s cubic-bezier(.2,1.6,.4,1); }
+.festa-card b { font-family: "Space Grotesk", Inter, sans-serif; font-size: 21px; }
+.festa-card span { color: var(--mudo); font-size: 14px; }
+.festa-card .festa-ico { font-size: 44px; color: inherit; }
+@keyframes pulo { from { transform: scale(.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #festa i { display: none; } .festa-card { animation: none; } }
+
+/* gráficos da semana */
+.corpo { width: 100%; max-width: 300px; margin: 0 auto; display: block; }
+.barras { width: 100%; height: auto; display: block; }
+.barras .b-at { fill: var(--ac); } .barras .b-ant { fill: #3A3F47; }
+.legenda { display: flex; gap: 14px; font-size: 12px; color: var(--mudo); }
+.legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.marca-ant { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--txt); opacity: .55; border-radius: 1px; }
+.comp { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 4px 12px; align-items: center; font-size: 14px; }
+.comp .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comp .num { text-align: right; }
+
+/* calendário e conquistas */
+.cal { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.cal span { width: 12px; height: 12px; border-radius: 3px; background: var(--s2); }
+.cal span.f { background: var(--ac); } .cal span.fora { background: transparent; }
+.cal span.hj { outline: 1.5px solid var(--txt); }
+.medalhas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.medalha { background: var(--s1); border: 1px solid var(--borda); border-radius: 14px; padding: 12px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.medalha .m-ico { font-size: 28px; filter: grayscale(1); opacity: .35; }
+.medalha.ganha { border-color: var(--ac); } .medalha.ganha .m-ico { filter: none; opacity: 1; }
+.medalha b { font-size: 12.5px; line-height: 1.25; } .medalha span { font-size: 11px; color: var(--mudo); }

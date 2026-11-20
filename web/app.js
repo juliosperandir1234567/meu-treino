@@ -7,6 +7,7 @@ import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino } fro
 import { telaPrint } from "./print.js";
 import { telaEvolucao, telaAvaliacao, telaMedirCasa, telaSemana } from "./evolucao.js";
 import { telaClientes, telaCliente, telaNovoCliente } from "./admin.js";
+import { telaConquistas, telaPublicarSemana } from "./conquistas.js";
 
 // ---------- cliques e mudanças (delegação) ----------
 document.addEventListener("click", (e) => {
@@ -58,6 +59,8 @@ async function rota() {
       case "avaliacao": return await telaAvaliacao();
       case "medir": return await telaMedirCasa();
       case "semana": return await telaSemana();
+      case "conquistas": return await telaConquistas();
+      case "publicar-semana": return await telaPublicarSemana();
       default: return ir("#/hoje");
     }
     return ir("#/hoje");

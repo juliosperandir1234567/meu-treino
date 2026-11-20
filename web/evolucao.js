@@ -1,7 +1,7 @@
 // Evolução (medidas, cargas, peso), avaliação física e resumo da semana.
 import {
   sb, acoes, render, ir, h, toast, q, fmt, kg, dataCurta, inicioSemana, ico, botaoVoltar, nav, grafico,
-  normal, metaReps, grupoDe, METAS,
+  normal, metaReps, grupoDe, METAS, corpoSvg, barrasSemana,
 } from "./util.js";
 import { formAvaliacao, lerFormAvaliacao } from "./print.js";
 import { volumeTxt } from "./treino.js";
@@ -135,9 +135,11 @@ acoes.salvarCasa = async (form) => {
 
 // ---------- RESUMO DA SEMANA ----------
 function chaveManter(exId, carga) { return `manter-${exId}-${carga}`; }
-export async function telaSemana() {
+// dados da semana atual e da anterior (usado na tela Semana e no card para compartilhar)
+export async function dadosSemana() {
   const ini = inicioSemana();
   const fimSem = new Date(ini); fimSem.setDate(fimSem.getDate() + 6);
+  const iniAnt = new Date(ini); iniAnt.setDate(iniAnt.getDate() - 7);
   // consultas em paralelo: o servidor fica longe, então cada ida e volta em sequência pesa
   const [rs, rx] = await Promise.all([
     sb.from("sessoes").select("id, inicio").order("inicio", { ascending: false }).limit(400),
@@ -145,15 +147,18 @@ export async function telaSemana() {
   ]);
   const sessoes = q(rs), exs = q(rx);
   const daSemana = sessoes.filter((s) => new Date(s.inicio) >= ini);
-  const ids = daSemana.map((s) => s.id);
+  const daAnterior = sessoes.filter((s) => { const d = new Date(s.inicio); return d >= iniAnt && d < ini; });
+  const ids = [...daSemana, ...daAnterior].map((s) => s.id);
   const exIds = exs.map((e) => e.id);
   const [rser, rhist] = await Promise.all([
     ids.length ? sb.from("series_feitas").select("*").in("sessao_id", ids) : { data: [] },
     exIds.length ? sb.from("series_feitas").select("exercicio_id, sessao_id, carga, reps, equipamento_opcao, feita_em").in("exercicio_id", exIds).order("feita_em", { ascending: false }).limit(800) : { data: [] },
   ]);
-  const ser = q(rser), hist = q(rhist);
+  const todas = q(rser), hist = q(rhist);
+  const daSem = new Set(daSemana.map((s) => s.id));
+  const ser = todas.filter((x) => daSem.has(x.sessao_id)), serAnt = todas.filter((x) => !daSem.has(x.sessao_id));
   const recordesP = contarRecordes(ser, ini);
-  const volume = ser.reduce((a, x) => a + (Number(x.carga) || 0) * (Number(x.reps) || 0), 0);
+  const vol = (xs) => xs.reduce((a, x) => a + (Number(x.carga) || 0) * (Number(x.reps) || 0), 0);
 
   // sequência de semanas com pelo menos 1 treino
   let seq = 0; const semanas = new Set(sessoes.map((s) => inicioSemana(new Date(s.inicio)).getTime()));
@@ -161,14 +166,33 @@ export async function telaSemana() {
   if (!semanas.has(cur.getTime())) cur.setDate(cur.getDate() - 7);
   while (semanas.has(cur.getTime())) { seq++; cur.setDate(cur.getDate() - 7); }
 
+  // por dia (segunda a domingo): volume; se não houver carga registrada, conta séries
+  const inicioDe = Object.fromEntries(sessoes.map((s) => [s.id, s.inicio]));
+  const usarVolume = vol(ser) + vol(serAnt) > 0;
+  const porDia = (xs) => {
+    const a = Array(7).fill(0);
+    xs.forEach((x) => { a[(new Date(inicioDe[x.sessao_id]).getDay() + 6) % 7] += usarVolume ? (Number(x.carga) || 0) * (Number(x.reps) || 0) : 1; });
+    return a;
+  };
+
   // séries por grupo muscular
-  const grupos = {}; ser.forEach((x) => { const g = grupoDe(x.exercicio_nome); grupos[g] = (grupos[g] || 0) + 1; });
-  const linhasGrupo = Object.keys(METAS).map((g) => {
-    const feito = grupos[g] || 0, meta = METAS[g], foco = g === "Ombro" || g === "Braço";
-    const pct = Math.min(100, Math.round((feito / meta) * 100));
-    return `<div class="col" style="gap:5px"><div class="entre peq"><span style="${foco ? "color:var(--ac);font-weight:600" : ""}">${g}${foco ? " · foco" : ""}</span><span class="mudo">${feito} / ${meta}${feito >= meta ? " ✓" : ""}</span></div>
-      <div class="barra" style="height:8px"><div style="width:${pct}%;${feito >= meta || foco ? "" : "background:var(--fraco)"}"></div></div></div>`;
-  }).join("");
+  const contaGrupos = (xs) => { const g = {}; xs.forEach((x) => { const k = grupoDe(x.exercicio_nome); g[k] = (g[k] || 0) + 1; }); return g; };
+
+  // comparativo por exercício: melhor série (maior carga, depois mais repetições)
+  const resumoEx = (xs) => {
+    const r = {};
+    xs.forEach((x) => {
+      const e = (r[x.exercicio_nome] ||= { carga: null, reps: null, series: 0 });
+      const c = x.carga == null ? null : Number(x.carga);
+      e.series++;
+      if (c != null && (e.carga == null || c > e.carga || (c === e.carga && (x.reps || 0) > (e.reps || 0)))) { e.carga = c; e.reps = x.reps; }
+      if (c == null && e.carga == null && (x.reps || 0) > (e.reps || 0)) e.reps = x.reps;
+    });
+    return r;
+  };
+  const exAtual = resumoEx(ser), exAnt = resumoEx(serAnt);
+  const ordem = [...new Set([...ser, ...serAnt].sort((a, b) => new Date(a.feita_em) - new Date(b.feita_em)).map((x) => x.exercicio_nome))];
+  ordem.sort((a, b) => (exAtual[b] ? 1 : 0) - (exAtual[a] ? 1 : 0));
 
   // sugestão de carga: bateu o máximo de repetições em todas as séries na última vez
   const sugestoes = [];
@@ -185,17 +209,67 @@ export async function telaSemana() {
     sugestoes.push({ e, carga, nova: carga + (carga >= 40 ? 5 : 2), meta });
   }
 
-  const recordes = await recordesP;
+  return {
+    ini, fimSem, seq, sugestoes, usarVolume,
+    treinos: daSemana.length, treinosAnt: daAnterior.length,
+    series: ser.length, seriesAnt: serAnt.length,
+    volume: vol(ser), volumeAnt: vol(serAnt),
+    dia: porDia(ser), diaAnt: porDia(serAnt),
+    grupos: contaGrupos(ser), gruposAnt: contaGrupos(serAnt),
+    exAtual, exAnt, ordem,
+    recordes: await recordesP,
+  };
+}
+export const pctGrupos = (grupos) => Object.fromEntries(Object.keys(METAS).map((g) => [g, Math.min(1, (grupos[g] || 0) / METAS[g])]));
+
+// compara a melhor série desta semana (a) com a da semana passada (b)
+function setaComp(a, b) {
+  if (!a || !b) return `<span class="mini mudo">${a ? "novo" : ""}</span>`;
+  const d = a.carga != null && b.carga != null ? a.carga - b.carga : 0;
+  const dr = (a.reps || 0) - (b.reps || 0);
+  if (d > 0 || (d === 0 && dr > 0)) return `<span class="ac" aria-label="subiu">▲</span>`;
+  if (d < 0 || (d === 0 && dr < 0)) return `<span class="lar" aria-label="caiu">▼</span>`;
+  return `<span class="mudo" aria-label="igual">=</span>`;
+}
+const serieTxt = (e) => !e ? "—" : e.carga != null ? `${fmt(e.carga)} kg${e.reps ? " × " + e.reps : ""}` : e.reps ? `${e.reps} reps` : `${e.series} sér.`;
+function pctTxt(a, b) {
+  if (!b) return a ? `<span class="mini ac">novo</span>` : `<span class="mini mudo">—</span>`;
+  const p = Math.round(((a - b) / b) * 100);
+  if (!p) return `<span class="mini mudo">igual</span>`;
+  return `<span class="mini ${p > 0 ? "ac" : "lar"}" style="font-weight:600">${p > 0 ? "▲ +" : "▼ "}${p}%</span>`;
+}
+
+export async function telaSemana() {
+  const d = await dadosSemana();
+  const { ini, fimSem, seq, sugestoes } = d;
+  const linhasGrupo = Object.keys(METAS).map((g) => {
+    const feito = d.grupos[g] || 0, antes = d.gruposAnt[g] || 0, meta = METAS[g], foco = g === "Ombro" || g === "Braço";
+    const pct = Math.min(100, Math.round((feito / meta) * 100)), pctAnt = Math.min(100, Math.round((antes / meta) * 100));
+    return `<div class="col" style="gap:5px"><div class="entre peq"><span style="${foco ? "color:var(--ac);font-weight:600" : ""}">${g}${foco ? " · foco" : ""}</span><span class="mudo">${feito} / ${meta}${feito >= meta ? " ✓" : ""}<span class="mini"> · antes ${antes}</span></span></div>
+      <div style="position:relative"><div class="barra" style="height:8px"><div style="width:${pct}%;${feito >= meta || foco ? "" : "background:var(--fraco)"}"></div></div>
+      ${antes ? `<span class="marca-ant" style="left:calc(${pctAnt}% - 1px)" title="semana passada"></span>` : ""}</div></div>`;
+  }).join("");
+  const comp = d.ordem.slice(0, 14).map((n) => `<span class="n">${h(n)}</span><span class="num mudo peq">${serieTxt(d.exAnt[n])}</span><span class="num"><b>${serieTxt(d.exAtual[n])}</b> ${setaComp(d.exAtual[n], d.exAnt[n])}</span>`).join("");
+  const unid = d.usarVolume ? "Volume" : "Séries";
   render(`<section class="tela">
     <div class="entre" style="align-items:flex-end"><div class="col" style="gap:4px"><span class="peq mudo">${ini.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })} a ${fimSem.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}</span><h1>Sua semana</h1></div>
       <span class="chip" style="color:var(--txt)">${ico("fogo", 14, 'style="color:var(--lar);vertical-align:-2px"')} ${seq} semana${seq === 1 ? "" : "s"} seguida${seq === 1 ? "" : "s"}</span></div>
     ${sugestoes.slice(0, 3).map((s) => `<div class="cartao"><div class="linha"><span class="ac">${ico("sobe", 18)}</span><span class="rot ac">Sugestão de carga</span></div>
       <span style="line-height:1.45">Você fez <b>${s.meta.max} repetições em todas as séries</b> de ${h(s.e.nome)}. Na próxima, tente <b>${kg(s.nova)}</b> (antes ${kg(s.carga)}).</span>
       <div class="linha"><button class="btn pri peq" data-acao="aplicarSug" data-id="${s.e.id}" data-c="${s.nova}">Aplicar</button><button class="btn peq" data-acao="manterSug" data-id="${s.e.id}" data-c="${s.carga}">Manter ${kg(s.carga)}</button></div></div>`).join("")}
-    <div class="cartao"><div class="entre"><b>Séries por músculo</b><span class="mini mudo">meta semanal</span></div>${linhasGrupo}</div>
-    <div class="grade3"><div class="stat"><span class="mini mudo">Treinos</span><span class="v">${daSemana.length}</span></div>
-      <div class="stat"><span class="mini mudo">Volume</span><span class="v">${volumeTxt(volume)}</span></div>
-      <div class="stat"><span class="mini mudo">Recordes</span><span class="v ac">${recordes}</span></div></div>
+    <div class="grade3"><div class="stat"><span class="mini mudo">Treinos</span><span class="v">${d.treinos}</span>${pctTxt(d.treinos, d.treinosAnt)}</div>
+      <div class="stat"><span class="mini mudo">Volume</span><span class="v">${volumeTxt(d.volume)}</span>${pctTxt(d.volume, d.volumeAnt)}</div>
+      <div class="stat"><span class="mini mudo">Recordes</span><span class="v ac">${d.recordes}</span><span class="mini mudo">nesta semana</span></div></div>
+    <div class="cartao"><div class="entre"><b>${unid} por dia</b><span class="legenda"><span><i style="background:#3A3F47"></i>Passada</span><span><i style="background:var(--ac)"></i>Esta</span></span></div>
+      ${d.series || d.seriesAnt ? barrasSemana(d.dia, d.diaAnt, ["S", "T", "Q", "Q", "S", "S", "D"]) : `<span class="mudo peq">Faça um treino para ver o gráfico.</span>`}</div>
+    <div class="cartao"><div class="entre"><b>Músculos da semana</b><span class="mini mudo">mais forte = mais séries</span></div>
+      ${corpoSvg(pctGrupos(d.grupos))}
+      ${linhasGrupo}
+      <span class="mini mudo"><span style="display:inline-block;width:2px;height:10px;background:var(--txt);opacity:.55;vertical-align:-1px"></span> semana passada · números = séries feitas / meta da semana</span></div>
+    <div class="cartao"><div class="entre"><b>Exercícios: passada × esta</b><span class="mini mudo">melhor série</span></div>
+      ${comp ? `<div class="comp"><span class="mini mudo">Exercício</span><span class="mini mudo num">Passada</span><span class="mini mudo num">Esta</span>${comp}</div>` : `<span class="mudo peq">Ainda não há séries nestas duas semanas.</span>`}</div>
+    <a class="item" href="#/conquistas"><span class="letra g">🏆</span><span class="col" style="flex:1;gap:2px"><b>Calendário e conquistas</b><span class="mini mudo">Seus dias de treino e as medalhas que já ganhou</span></span><span class="mudo">${ico("seta", 18)}</span></a>
+    <a class="btn pri blk" href="#/publicar-semana">${ico("share", 18)} Compartilhar minha semana</a>
   </section>${nav("#/semana")}`);
 }
 async function contarRecordes(ser, ini) {

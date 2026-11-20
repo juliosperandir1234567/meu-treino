@@ -2,7 +2,7 @@
 import {
   sb, acoes, mudancas, limpeza, render, renderSemRolar, ir, h, toast, q, num, fmt, kg, hora, mmss, duracao,
   metaReps, ico, botaoVoltar, treinoAtivo, salvarTreinoAtivo, fotoUrl, fotoUrls, reduzir, enviarFoto, escolherFoto,
-  carregarImagem, bip, destravarAudio, manterTelaLigada,
+  carregarImagem, bip, destravarAudio, manterTelaLigada, comemorar,
 } from "./util.js";
 
 let D = null; // dados do treino carregados
@@ -184,6 +184,11 @@ acoes.feitoSerie = async (el) => {
   } else t.descansoAte = null;
   salvarTreinoAtivo(t);
 
+  // ---- recorde na hora: maior carga que já fez neste exercício ----
+  const maxAntes = Math.max(0, ...D.hist.filter((x) => x.exercicio_id === ex.id).map((x) => Number(x.carga) || 0));
+  const maxHoje = Math.max(0, ...D.feitas.filter((x) => x.exercicio_id === ex.id && x.id !== linha.id).map((x) => Number(x.carga) || 0));
+  if (carga && maxAntes && carga > maxAntes && carga > maxHoje) comemorar("Novo recorde!", `${ex.nome}: ${kg(carga)} (antes ${kg(maxAntes)})`);
+
   // ---- avisos: acima ou abaixo da ficha ----
   const uv = ultimaVez(ex.id, opcao);
   const ref = ex.carga_prevista ?? uv.max;
@@ -337,6 +342,13 @@ export async function telaFim(id) {
     <button class="btn perigo peq" data-acao="apagarSessao" data-id="${s.id}">${ico("lixo", 16)} Apagar este treino</button>
   </section>
   <div class="rodape"><div><a class="btn" href="#/hoje">Só salvar</a><a class="btn pri" href="#/publicar/${s.id}">${ico("share", 18)} Publicar</a></div></div>`);
+  // comemoração só na primeira vez que esta tela abre para este treino
+  let jaFesta = false;
+  try { jaFesta = !!sessionStorage.getItem("festa-" + s.id); sessionStorage.setItem("festa-" + s.id, "1"); } catch { /* */ }
+  if (!jaFesta) {
+    if (recordes.length) comemorar(recordes.length === 1 ? "Novo recorde!" : `${recordes.length} recordes!`, recordes.map((r) => `${r.nome} ${kg(r.carga)}`).join(" · "));
+    import("./conquistas.js").then((m) => m.checarConquistas(recordes.length ? 3800 : 0)).catch(() => {});
+  }
 }
 mudancas.horaSessao = async (el) => {
   if (!el.value) return;
@@ -434,7 +446,8 @@ async function desenharCard({ s, ser, volume, recordes }, foto) {
   c.fillText(`${new Date(s.inicio).toLocaleDateString("pt-BR")} · ${ser.length} séries`, M, y - 240);
   ultimaImagem = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.92));
 }
-function roundRect(c, x, y, w, hh, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + hh, r); c.arcTo(x + w, y + hh, x, y + hh, r); c.arcTo(x, y + hh, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+export function definirImagem(b) { ultimaImagem = b; }
+export function roundRect(c, x, y, w, hh, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + hh, r); c.arcTo(x + w, y + hh, x, y + hh, r); c.arcTo(x, y + hh, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 
 acoes.compartilhar = async () => {
   if (!ultimaImagem) return toast("A imagem ainda está sendo montada");

@@ -240,3 +240,61 @@ export async function manterTelaLigada(on) {
     if (!on && trava) { await trava.release(); trava = null; }
   } catch { /* não suportado */ }
 }
+
+// ---------- comemoração (recordes e conquistas) ----------
+export function comemorar(titulo, sub = "") {
+  document.getElementById("festa")?.remove();
+  const cores = ["#C6F432", "#FFB547", "#F2F3F5", "#7CD4FF", "#FF7AA8"];
+  const pedacos = Array.from({ length: 46 }, (_, i) => {
+    const x = Math.random() * 100, d = 1.6 + Math.random() * 1.4, at = Math.random() * 0.5, r = Math.random() * 360;
+    return `<i style="left:${x}%;background:${cores[i % cores.length]};animation-duration:${d}s;animation-delay:${at}s;transform:rotate(${r}deg)"></i>`;
+  }).join("");
+  const el = document.createElement("div");
+  el.id = "festa"; el.setAttribute("role", "status");
+  el.innerHTML = `${pedacos}<div class="festa-card"><span class="festa-ico">🏆</span><b>${h(titulo)}</b>${sub ? `<span>${h(sub)}</span>` : ""}</div>`;
+  el.addEventListener("click", () => el.remove());
+  document.body.appendChild(el);
+  try { navigator.vibrate?.([80, 60, 120]); } catch { /* */ }
+  bip(3);
+  setTimeout(() => el.remove(), 3600);
+}
+
+// ---------- desenho do corpo com os músculos da semana ----------
+// pct: { "Ombro": 0..1, "Peito": ..., "Braço", "Costas", "Pernas", "Abdômen" }
+export function corpoSvg(pct = {}) {
+  const cor = (g) => {
+    const p = Math.max(0, Math.min(1, pct[g] || 0));
+    return p ? `fill="#C6F432" fill-opacity="${(0.22 + 0.78 * p).toFixed(2)}"` : `fill="#2A2E34"`;
+  };
+  const neutro = `fill="#202328"`;
+  const r = (x, y, w, hh, rx, g) => `<rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="${rx}" ${g ? cor(g) : neutro}><title>${g || ""}</title></rect>`;
+  const c = (x, y, raio, g) => `<circle cx="${x}" cy="${y}" r="${raio}" ${g ? cor(g) : neutro}><title>${g || ""}</title></circle>`;
+  const figura = (cx, costas) => [
+    c(cx, 16, 11), c(cx - 25, 38, 9, "Ombro"), c(cx + 25, 38, 9, "Ombro"),
+    costas
+      ? r(cx - 20, 30, 40, 24, 7, "Costas") + r(cx - 18, 56, 36, 22, 7, "Costas") + r(cx - 12, 80, 24, 10, 4, "Costas")
+      : r(cx - 20, 31, 19, 21, 6, "Peito") + r(cx + 1, 31, 19, 21, 6, "Peito") + r(cx - 14, 55, 28, 35, 7, "Abdômen"),
+    r(cx - 39, 46, 11, 27, 5, "Braço"), r(cx + 28, 46, 11, 27, 5, "Braço"),
+    r(cx - 41, 76, 10, 26, 5), r(cx + 31, 76, 10, 26, 5),
+    costas ? r(cx - 18, 92, 17, 17, 7, "Pernas") + r(cx + 1, 92, 17, 17, 7, "Pernas") : r(cx - 18, 92, 36, 14, 6),
+    r(cx - 19, costas ? 111 : 108, 17, costas ? 40 : 43, 7, "Pernas"), r(cx + 2, costas ? 111 : 108, 17, costas ? 40 : 43, 7, "Pernas"),
+    r(cx - 17, 155, 13, 38, 6, "Pernas"), r(cx + 4, 155, 13, 38, 6, "Pernas"),
+    `<text x="${cx}" y="208" text-anchor="middle" font-size="11" font-family="Inter, Arial, sans-serif" fill="#9AA0A8">${costas ? "Costas" : "Frente"}</text>`,
+  ].join("");
+  return `<svg class="corpo" viewBox="0 0 220 214" role="img" aria-label="Músculos treinados na semana">${figura(58, false)}${figura(162, true)}</svg>`;
+}
+
+// ---------- barras: esta semana × semana passada (por dia) ----------
+export function barrasSemana(atual, passada, rotulos) {
+  const W = 320, H = 130, base = H - 18, topo = 8;
+  const max = Math.max(1, ...atual, ...passada);
+  const larg = W / rotulos.length;
+  const barra = (v, x, w, cls) => { const hh = v ? Math.max(3, ((base - topo) * v) / max) : 0; return hh ? `<rect class="${cls}" x="${x}" y="${base - hh}" width="${w}" height="${hh}" rx="3"/>` : ""; };
+  const cols = rotulos.map((t, i) => {
+    const x0 = i * larg + larg * 0.18, w = larg * 0.3;
+    return barra(passada[i], x0, w, "b-ant") + barra(atual[i], x0 + w + 2, w, "b-at")
+      + `<text x="${i * larg + larg / 2}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#9AA0A8">${t}</text>`;
+  }).join("");
+  return `<svg class="barras" viewBox="0 0 ${W} ${H}" role="img" aria-label="Volume por dia, esta semana e a anterior">
+    <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#2A2E34"/>${cols}</svg>`;
+}

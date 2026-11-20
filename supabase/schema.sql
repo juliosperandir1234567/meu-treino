@@ -176,3 +176,20 @@ create policy "fotos do dono - alterar" on storage.objects for update to authent
   using (bucket_id = 'fotos' and (storage.foldername(name))[1] = (select auth.uid())::text and (select public.conta_ativa()));
 create policy "fotos do dono - apagar" on storage.objects for delete to authenticated
   using (bucket_id = 'fotos' and (storage.foldername(name))[1] = (select auth.uid())::text and (select public.conta_ativa()));
+
+-- ---------- Estatísticas para conquistas e calendário (respeita o RLS: cada um só soma o que é seu) ----------
+create or replace function public.minhas_estatisticas() returns json
+language sql stable security invoker set search_path = '' as $$
+  select json_build_object(
+    'dias', coalesce((select json_agg(d order by d) from (
+        select distinct (inicio at time zone 'America/Sao_Paulo')::date as d
+        from public.sessoes where user_id = (select auth.uid()) and fim is not null) x), '[]'::json),
+    'treinos', (select count(*) from public.sessoes where user_id = (select auth.uid()) and fim is not null),
+    'volume', (select coalesce(sum(coalesce(carga, 0) * coalesce(reps, 0)), 0) from public.series_feitas where user_id = (select auth.uid())),
+    'series', (select count(*) from public.series_feitas where user_id = (select auth.uid())),
+    'carga_max', (select max(carga) from public.series_feitas where user_id = (select auth.uid())),
+    'ex_carga_max', (select exercicio_nome from public.series_feitas where user_id = (select auth.uid()) and carga is not null order by carga desc limit 1)
+  );
+$$;
+revoke execute on function public.minhas_estatisticas() from public, anon;
+grant execute on function public.minhas_estatisticas() to authenticated;
