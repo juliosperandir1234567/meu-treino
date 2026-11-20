@@ -17,7 +17,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 
 #app { max-width: 520px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; }
-#app.carregando > .tela { opacity: .5; transition: opacity .15s .12s; pointer-events: none; }
+#app.trocando > .tela { opacity: .5; transition: opacity .15s .12s; pointer-events: none; }
 .tela { flex: 1; padding: calc(var(--topo) + 20px) 18px calc(var(--base) + 110px); display: flex; flex-direction: column; gap: 16px; }
 .tela.sem-nav { padding-bottom: calc(var(--base) + 110px); }
 .carregando { padding: 120px 20px; text-align: center; color: var(--mudo); }

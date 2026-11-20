@@ -18,18 +18,18 @@ export const limpeza = { fn: null };  // parar timers ao trocar de tela
 const ABAS = new Set(["#/hoje", "#/evolucao", "#/semana", "#/avaliacao", "#/clientes"]);
 const guardadas = new Map();
 let mostrandoGuardada = null;
-const chaveTela = () => (location.hash.replace(/^#/?$/, "") || "#/hoje");
+const chaveTela = () => (location.hash.replace(/^#\/?$/, "") || "#/hoje");
 export function mostrarGuardada() {
   const k = chaveTela(), html = guardadas.get(k);
   if (html) { app().innerHTML = html; window.scrollTo(0, 0); mostrandoGuardada = k; return true; }
-  app().classList.add("carregando");   // sem tela guardada: escurece a atual enquanto carrega
+  app().classList.add("trocando");   // sem tela guardada: escurece a atual enquanto carrega
   return false;
 }
 export function esquecerTelas() { guardadas.clear(); mostrandoGuardada = null; }
 export function render(html) {
   const k = chaveTela(), antes = guardadas.get(k);
   if (ABAS.has(k.split("?")[0])) guardadas.set(k, html);
-  app().classList.remove("carregando");
+  app().classList.remove("trocando");
   if (mostrandoGuardada === k) { mostrandoGuardada = null; if (antes !== html) renderSemRolar(html); return; }
   mostrandoGuardada = null;
   app().innerHTML = html; window.scrollTo(0, 0);

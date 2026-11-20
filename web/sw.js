@@ -1,5 +1,5 @@
 // Service worker simples: guarda os arquivos do app para abrir rápido.
-const CACHE = "meu-treino-v3";
+const CACHE = "meu-treino-v4";
 const ARQUIVOS = ["./", "index.html", "style.css", "app.js", "util.js", "treino.js", "print.js", "evolucao.js", "admin.js", "config.js", "manifest.json", "icon.svg"];
 
 self.addEventListener("install", (e) => {
