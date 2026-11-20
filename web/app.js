@@ -222,9 +222,10 @@ async function telaHoje() {
   const ini = inicioSemana();
   const [fichas, rr] = await Promise.all([
     carregarFichas(),
-    sb.from("sessoes").select("id, ficha_id, inicio, fim").order("inicio", { ascending: false }).limit(200),
+    sb.from("sessoes").select("id, ficha_id, inicio, fim, series_feitas(count)").order("inicio", { ascending: false }).limit(200),
   ]);
-  const recentes = q(rr);
+  // treino aberto e abandonado sem nenhuma série não conta
+  const recentes = q(rr).filter((s) => (s.series_feitas?.[0]?.count || 0) > 0);
   const semana = recentes.filter((s) => new Date(s.inicio) >= ini);
   const ultimaPorFicha = {};
   recentes.forEach((s) => { if (s.ficha_id && !ultimaPorFicha[s.ficha_id]) ultimaPorFicha[s.ficha_id] = s.inicio; });

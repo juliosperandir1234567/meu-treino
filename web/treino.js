@@ -13,6 +13,8 @@ let D = null; // dados do treino carregados
 export async function iniciarTreino(fichaId) {
   const ativo = treinoAtivo();
   if (ativo && !confirm("Já existe um treino em andamento. Começar outro mesmo assim?")) return ir("#/treino");
+  // o treino anterior foi aberto e nenhuma série foi marcada: apaga, para não contar como treino
+  if (ativo && Array.isArray(ativo.feitas) && !ativo.feitas.length) enfileirar({ tipo: "del", tab: "sessoes", id: ativo.sessaoId });
   let f;
   try { f = q(await sb.from("fichas").select("*").eq("id", fichaId).single()); }
   catch (e) { f = guardado(fichaId)?.f; if (!f) throw new Error("Sem internet, e este treino ainda não foi aberto neste celular"); }

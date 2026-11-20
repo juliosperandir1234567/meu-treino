@@ -180,11 +180,16 @@ create policy "fotos do dono - apagar" on storage.objects for delete to authenti
 -- ---------- Estatísticas para conquistas e calendário (respeita o RLS: cada um só soma o que é seu) ----------
 create or replace function public.minhas_estatisticas() returns json
 language sql stable security invoker set search_path = '' as $$
+  -- só conta treino com pelo menos uma série (treino aberto e abandonado não conta)
+  with treinos as (
+    select s.id, s.inicio from public.sessoes s
+    where s.user_id = (select auth.uid())
+      and exists (select 1 from public.series_feitas f where f.sessao_id = s.id)
+  )
   select json_build_object(
     'dias', coalesce((select json_agg(d order by d) from (
-        select distinct (inicio at time zone 'America/Sao_Paulo')::date as d
-        from public.sessoes where user_id = (select auth.uid()) and fim is not null) x), '[]'::json),
-    'treinos', (select count(*) from public.sessoes where user_id = (select auth.uid()) and fim is not null),
+        select distinct (inicio at time zone 'America/Sao_Paulo')::date as d from treinos) x), '[]'::json),
+    'treinos', (select count(*) from treinos),
     'volume', (select coalesce(sum(coalesce(carga, 0) * coalesce(reps, 0)), 0) from public.series_feitas where user_id = (select auth.uid())),
     'series', (select count(*) from public.series_feitas where user_id = (select auth.uid())),
     'carga_max', (select max(carga) from public.series_feitas where user_id = (select auth.uid())),

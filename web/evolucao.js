@@ -154,10 +154,10 @@ export async function dadosSemana() {
   const iniAnt = new Date(ini); iniAnt.setDate(iniAnt.getDate() - 7);
   // consultas em paralelo: o servidor fica longe, então cada ida e volta em sequência pesa
   const [rs, rx] = await Promise.all([
-    sb.from("sessoes").select("id, inicio").order("inicio", { ascending: false }).limit(400),
+    sb.from("sessoes").select("id, inicio, series_feitas(count)").order("inicio", { ascending: false }).limit(400),
     sb.from("exercicios").select("id, nome, series, reps, carga_prevista").eq("ativo", true),
   ]);
-  const sessoes = q(rs), exs = q(rx);
+  const sessoes = q(rs).filter((s) => (s.series_feitas?.[0]?.count || 0) > 0), exs = q(rx);   // só treino com série feita
   const daSemana = sessoes.filter((s) => new Date(s.inicio) >= ini);
   const daAnterior = sessoes.filter((s) => { const d = new Date(s.inicio); return d >= iniAnt && d < ini; });
   const ids = [...daSemana, ...daAnterior].map((s) => s.id);
@@ -250,7 +250,7 @@ function setaComp(a, b) {
 }
 const serieTxt = (e) => !e ? "—" : e.carga != null ? `${fmt(e.carga)} kg${e.reps ? " × " + e.reps : ""}` : e.reps ? `${e.reps} reps` : `${e.series} sér.`;
 function pctTxt(a, b) {
-  if (!b) return a ? `<span class="mini ac">novo</span>` : `<span class="mini mudo">—</span>`;
+  if (!b) return a ? `<span class="mini mudo">sem semana passada</span>` : `<span class="mini mudo">—</span>`;
   const p = Math.round(((a - b) / b) * 100);
   if (!p) return `<span class="mini mudo">igual</span>`;
   return `<span class="mini ${p > 0 ? "ac" : "lar"}" style="font-weight:600">${p > 0 ? "▲ +" : "▼ "}${p}%</span>`;
