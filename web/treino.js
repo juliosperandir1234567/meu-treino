@@ -2,8 +2,9 @@
 import {
   sb, acoes, mudancas, limpeza, render, renderSemRolar, ir, h, toast, q, num, fmt, kg, hora, mmss, duracao,
   metaReps, ico, botaoVoltar, treinoAtivo, salvarTreinoAtivo, fotoUrl, fotoUrls, reduzir, enviarFoto, escolherFoto,
-  carregarImagem, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha,
+  carregarImagem, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha, grafico,
 } from "./util.js";
+import { exImg, carregarMidia, preencherMidia } from "./midia.js";
 
 let D = null; // dados do treino carregados
 
@@ -29,6 +30,8 @@ async function carregar(t) {
   const hist = ids.length ? q(await sb.from("series_feitas").select("*").in("exercicio_id", ids).neq("sessao_id", t.sessaoId).order("feita_em", { ascending: false }).limit(600)) : [];
   const urls = await fotoUrls(eqs.map((e) => e.foto_path));
   D = { sessaoId: t.sessaoId, s, exs, eqs, feitas, hist, urls, avisos: [], avisouAcima: {} };
+  // imagens do movimento: chegam em segundo plano e entram na tela sem atrapalhar
+  carregarMidia(exs.map((e) => e.nome)).then(() => preencherMidia()).catch(() => {});
 }
 
 // séries da última vez (mesmo exercício e mesma opção de equipamento)
@@ -126,6 +129,17 @@ function desenharTreino(rolar = false) {
         <div class="linha" style="gap:6px"><button class="btn peq" data-acao="ajusteDescanso" data-s="-15">−15s</button><button class="btn peq" data-acao="ajusteDescanso" data-s="15">+15s</button><button class="btn peq cla" data-acao="pularDescanso">Pular</button></div></div>
       <div class="barra"><div id="barDescanso" style="width:${resta < 0 ? 100 : Math.max(0, (resta / (t.descansoTotal || 90)) * 100)}%;${resta < 0 ? "background:var(--lar)" : ""}"></div></div></div>` : "";
 
+  const porSessao = new Map();
+  [...D.hist.filter((x) => x.exercicio_id === ex.id)].reverse().forEach((x) => {
+    const c = Number(x.carga) || 0, v = porSessao.get(x.sessao_id);
+    if (!v) porSessao.set(x.sessao_id, { c, d: x.feita_em }); else if (c > v.c) v.c = c;
+  });
+  const histPts = [...porSessao.values()].slice(-9);
+  const maxHoje = Math.max(0, ...feitas.map((x) => Number(x.carga) || 0));
+  if (maxHoje) histPts.push({ c: maxHoje, d: new Date().toISOString() });
+  const historico = histPts.length >= 2 ? `<div class="cartao"><div class="entre"><b>Histórico de carga</b><span class="mini mudo">maior carga por treino</span></div>
+    ${grafico(histPts.map((x) => x.c), histPts.map((x) => new Date(x.d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })))}
+    <div class="entre mini mudo"><span>Primeira: <b style="color:var(--txt)">${kg(histPts[0].c)}</b></span><span>Melhor: <b class="ac">${kg(Math.max(...histPts.map((x) => x.c)))}</b></span></div></div>` : "";
   const html = `<section class="tela">
     <div class="topo">${botaoVoltar("#/hoje")}<div class="tit" style="align-items:center"><b class="num" style="font-size:17px">${h(t.fichaNome)}</b>
       <span class="peq mudo">Início ${hora(D.s.inicio)} · <span id="decorrido">${mmss((Date.now() - new Date(D.s.inicio)) / 1000)}</span> de treino</span></div><span style="width:44px"></span></div>
@@ -134,11 +148,13 @@ function desenharTreino(rolar = false) {
     <div class="exs">${D.exs.map((e, i) => `<button data-acao="irEx" data-i="${i}" class="${i === t.idx ? "at" : exsFeitos.has(e.id) ? "fe" : ""}" aria-label="${h(e.nome)}">${i + 1}</button>`).join("")}</div>
     ${avisos}
     <div class="cartao">
-      <div class="linha" style="align-items:flex-start;gap:12px">
-        ${fotoEq ? `<button class="eq-mini" data-acao="verFoto" data-src="${h(fotoEq)}" data-tit="${h(eq?.nome || ex.nome)}" aria-label="Ver foto do equipamento"><img src="${h(fotoEq)}" alt=""><span>${ico("mais", 12)}</span></button>` : ""}
-        <div class="col" style="gap:4px;min-width:0;flex:1"><h2>${h(ex.nome)}</h2>
+      <div class="ex-midia">
+        ${verAparelho && fotoEq ? `<button class="ex-foto-ap" data-acao="verFoto" data-src="${h(fotoEq)}" data-tit="${h(eq?.nome || ex.nome)}" aria-label="Ampliar foto do aparelho"><img src="${h(fotoEq)}" alt="Foto do aparelho"></button>` : exImg(ex.nome, "grande")}
+        ${fotoEq ? `<div class="ex-midia-abas"><button class="${verAparelho ? "" : "at"}" data-acao="midiaAba" data-v="0">Movimento</button><button class="${verAparelho ? "at" : ""}" data-acao="midiaAba" data-v="1">Meu aparelho</button></div>` : ""}
+      </div>
+      <div class="col" style="gap:4px;min-width:0"><h2>${h(ex.nome)}</h2>
         <span class="peq mudo">${ex.series} séries · ${h(ex.reps)} repetições${ex.carga_prevista ? " · ficha " + kg(ex.carga_prevista) : ""} · descanso ${mmss(ex.descanso_seg)}</span>
-        ${ex.obs ? `<span class="peq ac">${h(ex.obs)}</span>` : ""}</div></div>
+        ${ex.obs ? `<span class="peq ac">${h(ex.obs)}</span>` : ""}</div>
       <div class="grade2">
         <a href="#/equip/${ex.id}" class="btn peq">${ico("imagem", 16)} ${eq?.nome ? h(eq.nome.slice(0, 16)) : "Equipamento"}${qtdOpc > 1 ? ` · ${opcao}/${qtdOpc}` : ""}</a>
         <button class="btn peq" data-acao="comoFazer" data-nome="${h(ex.nome)}">${ico("play", 15)} Como fazer</button></div>
@@ -147,6 +163,7 @@ function desenharTreino(rolar = false) {
         ${descansos.length ? `<span class="mini mudo" style="text-align:right">Descansos: ${descansos.join(" · ")}</span>` : ""}</div>
     </div>
     ${descanso}
+    ${historico}
     ${t.idx + 1 < n ? `<div class="col" style="gap:8px"><span class="rot">A seguir</span><button class="cartao tracejado" style="text-align:left;color:inherit" data-acao="irEx" data-i="${t.idx + 1}">
       <div class="entre"><div class="col" style="gap:2px"><b>${h(D.exs[t.idx + 1].nome)}</b><span class="mini mudo">${D.exs[t.idx + 1].series} × ${h(D.exs[t.idx + 1].reps)}</span></div><span class="peq mudo">${t.idx + 2}/${n}</span></div></button></div>` : ""}
   </section>
@@ -208,6 +225,8 @@ acoes.comoFazer = async (el) => {
     if (document.body.contains(alvo)) alvo.innerHTML = `<div class="cartao"><span class="peq lar">${h(e.message || "Não consegui carregar a explicação")}</span><span class="mini mudo">Os vídeos acima continuam funcionando.</span></div>`;
   }
 };
+let verAparelho = false;
+acoes.midiaAba = (el) => { verAparelho = el.dataset.v === "1"; desenharTreino(); };
 acoes.irEx = (el) => { const t = treinoAtivo(); t.idx = Number(el.dataset.i); salvarTreinoAtivo(t); desenharTreino(true); };
 acoes.maisSerie = async () => {
   const t = treinoAtivo(); const ex = D.exs[t.idx];

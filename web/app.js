@@ -1,6 +1,6 @@
 // Meu Treino — rotas, login, tela Hoje, fichas e edição de exercícios.
 import {
-  sb, configOk, sessao, acoes, limpeza, mudancas, render, mostrarGuardada, esquecerTelas, ir, h, toast, erro, q, num, fmt, kg,
+  sb, configOk, sessao, acoes, limpeza, mudancas, render, renderSemRolar, corpoSvg, mostrarGuardada, esquecerTelas, ir, h, toast, erro, q, num, fmt, kg,
   dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe,
 } from "./util.js";
 import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino } from "./treino.js";
@@ -8,6 +8,8 @@ import { telaPrint } from "./print.js";
 import { telaEvolucao, telaAvaliacao, telaMedirCasa, telaSemana } from "./evolucao.js";
 import { telaClientes, telaCliente, telaNovoCliente } from "./admin.js";
 import { telaConquistas, telaPublicarSemana } from "./conquistas.js";
+import { exImg, seloMusculo, musculosDe, carregarMidia, preencherMidia } from "./midia.js";
+import { telaPerfil, avatarHtml } from "./perfil.js";
 
 // ---------- cliques e mudanças (delegação) ----------
 document.addEventListener("click", (e) => {
@@ -60,6 +62,7 @@ async function rota() {
       case "medir": return await telaMedirCasa();
       case "semana": return await telaSemana();
       case "conquistas": return await telaConquistas();
+      case "perfil": return await telaPerfil();
       case "publicar-semana": return await telaPublicarSemana();
       default: return ir("#/hoje");
     }
@@ -153,6 +156,7 @@ export async function carregarFichas() {
   fichas.forEach((f) => {
     const meus = exs.filter((e) => e.ficha_id === f.id);
     f.qtd = meus.length;
+    f.nomes = meus.map((e) => e.nome);
     f.series = meus.reduce((a, e) => a + (e.series || 0), 0);
     // tempo estimado: ~45 s por série + o descanso
     f.minutos = Math.round(meus.reduce((a, e) => a + (e.series || 0) * (45 + (e.descanso_seg || 60)), 0) / 60);
@@ -223,6 +227,7 @@ async function telaHoje() {
       <div class="linha" style="gap:16px;align-items:center"><span class="letra xg">${h(prox.letra)}</span>
         <div class="col" style="gap:6px;min-width:0"><h2 class="heroi-tit">${h(prox.nome || "Treino " + prox.letra)}</h2>
         ${prox.grupos.length ? `<div class="linha" style="gap:6px;flex-wrap:wrap">${chipsGrupo(prox)}</div>` : ""}</div></div>
+      ${prox.nomes.length ? `<div class="heroi-fotos">${prox.nomes.slice(0, 4).map((n) => exImg(n)).join("")}${prox.nomes.length > 4 ? `<span class="heroi-mais">+${prox.nomes.length - 4}</span>` : ""}</div>` : ""}
       <div class="heroi-num">
         <div><b>${prox.qtd}</b><span>exercícios</span></div>
         <div><b>${prox.series}</b><span>séries</span></div>
@@ -240,7 +245,7 @@ async function telaHoje() {
     <div class="entre"><div class="col" style="gap:4px"><span class="peq mudo">${dataLonga()}</span>
       <button class="nome-btn" data-acao="meuNome" aria-label="Trocar meu nome"><h1>${saudacao()}</h1></button>
       ${(sessao.perfil?.nome || "").trim() ? "" : `<button class="btn peq" style="align-self:flex-start" data-acao="meuNome">${ico("pessoa", 16)} Como quer ser chamado?</button>`}</div>
-      <button class="ico" data-acao="sair" aria-label="Sair da conta">${ico("sair")}</button></div>
+      <a href="#/perfil" aria-label="Meu perfil">${await avatarHtml(46)}</a></div>
     ${destaque}
     <a class="cartao semana-cartao" href="#/semana">
       <div class="entre"><b>Esta semana</b><span class="linha" style="gap:8px">
@@ -255,6 +260,7 @@ async function telaHoje() {
       <a class="item tracejado" href="#/print"><span class="letra">${ico("camera", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Atualizar por print</b><span class="mini mudo">Mandou ficha nova na academia? Envie o print</span></span><span class="mudo">${ico("seta", 18)}</span></a></div>` : ""}
   </section>
   ${nav("#/hoje")}`);
+  if (prox && !ativo) carregarMidia(prox.nomes).then(() => preencherMidia()).catch(() => {});
 }
 acoes.meuNome = async () => {
   const atual = (sessao.perfil?.nome || "").trim();
@@ -262,7 +268,7 @@ acoes.meuNome = async () => {
   if (novo === null || novo.trim() === atual) return;
   q(await sb.rpc("definir_meu_nome", { novo: novo.trim() }));
   if (sessao.perfil) sessao.perfil.nome = novo.trim();
-  toast("Nome salvo"); telaHoje();
+  toast("Nome salvo"); ir(location.hash);
 };
 acoes.iniciar = async (el) => { await iniciarTreino(el.dataset.ficha); };
 acoes.novaFicha = async () => {
@@ -275,26 +281,50 @@ acoes.novaFicha = async () => {
 
 // ---------- FICHA ----------
 async function telaFicha(id) {
-  const f = q(await sb.from("fichas").select("*").eq("id", id).single());
-  const exs = q(await sb.from("exercicios").select("*").eq("ficha_id", id).eq("ativo", true).order("ordem"));
-  render(`<section class="tela">
-    <div class="topo">${botaoVoltar("#/hoje")}<div class="tit"><h2>Treino ${h(f.letra)}${f.nome ? " · " + h(f.nome) : ""}</h2>
-      <span class="mini mudo">${exs.length} exercícios · atualizado em ${new Date(f.atualizado_em).toLocaleDateString("pt-BR")}</span></div></div>
-    <div class="cartao"><div class="grade2" style="grid-template-columns:80px 1fr">
+  const editar = new URLSearchParams(location.hash.split("?")[1] || "").get("editar") === "1";
+  const [rf, re] = await Promise.all([
+    sb.from("fichas").select("*").eq("id", id).single(),
+    sb.from("exercicios").select("*").eq("ficha_id", id).eq("ativo", true).order("ordem"),
+  ]);
+  const f = q(rf), exs = q(re);
+  const desenhar = (semRolar = false) => {
+    // músculos alvo: soma de todos os exercícios, do mais trabalhado para o menos
+    const alvo = new Map();
+    exs.forEach((e) => musculosDe(e.nome).forEach((m) => { const x = alvo.get(m.nome) || { ...m, n: 0 }; x.n++; alvo.set(m.nome, x); }));
+    const alvos = [...alvo.values()].sort((a, b) => b.n - a.n).slice(0, 6);
+    const series = exs.reduce((a, e) => a + (e.series || 0), 0);
+    const minutos = Math.round(exs.reduce((a, e) => a + (e.series || 0) * (45 + (e.descanso_seg || 60)), 0) / 60);
+    (semRolar ? renderSemRolar : render)(`<section class="tela">
+    <div class="topo">${botaoVoltar(editar ? `#/ficha/${f.id}` : "#/hoje")}<div class="tit"><span class="rot ac">Treino ${h(f.letra)}</span><h2>${h(f.nome || "Treino " + f.letra)}</h2></div>
+      ${editar ? "" : `<a class="ico" href="#/ficha/${f.id}?editar=1" aria-label="Editar ficha">${ico("lapis", 18)}</a>`}</div>
+    ${editar ? `<div class="cartao"><div class="grade2" style="grid-template-columns:80px 1fr">
       <label class="campo">Letra<input class="inp" maxlength="3" value="${h(f.letra)}" data-muda="fichaCampo" data-id="${f.id}" data-campo="letra"></label>
-      <label class="campo">Nome<input class="inp" placeholder="Ex.: Ombro e tríceps" value="${h(f.nome)}" data-muda="fichaCampo" data-id="${f.id}" data-campo="nome"></label></div></div>
-    <div class="col">
-      ${exs.map((e, i) => `<div class="item">
-        <span class="col" style="gap:2px;align-items:center"><button class="ico" style="width:32px;height:28px;border:0;background:none" data-acao="moverEx" data-id="${e.id}" data-dir="-1" aria-label="Subir"${i === 0 ? " disabled" : ""}>${ico("cima", 16)}</button>
-        <button class="ico" style="width:32px;height:28px;border:0;background:none" data-acao="moverEx" data-id="${e.id}" data-dir="1" aria-label="Descer"${i === exs.length - 1 ? " disabled" : ""}>${ico("baixo", 16)}</button></span>
-        <a href="#/ex/${e.id}" class="col" style="flex:1;gap:2px;color:inherit;text-decoration:none"><b>${h(e.nome)}</b>
-        <span class="mini mudo">${e.series} × ${h(e.reps)}${e.carga_prevista ? " · " + kg(e.carga_prevista) : ""} · descanso ${e.descanso_seg}s</span></a>
-        <a href="#/ex/${e.id}" class="mudo" aria-label="Editar">${ico("lapis", 18)}</a></div>`).join("") || `<div class="vazio">Nenhum exercício ainda.</div>`}
+      <label class="campo">Nome<input class="inp" placeholder="Ex.: Ombro e tríceps" value="${h(f.nome)}" data-muda="fichaCampo" data-id="${f.id}" data-campo="nome"></label></div>
+      <span class="mini mudo">Use as setas para mudar a ordem. Toque no exercício para editar.</span></div>` : `
+    <div class="chips-linha"><span class="chip">${ico("relogio", 13, 'style="vertical-align:-2px"')} ~${minutos} min</span><span class="chip">${exs.length} exercícios</span><span class="chip">${series} séries</span>
+      <span class="chip">Atualizada ${new Date(f.atualizado_em).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span></div>
+    ${alvos.length ? `<div class="col" style="gap:10px"><span class="rot">Músculos alvo</span>
+      <div class="alvos">${alvos.map((m) => `<div class="alvo">${corpoSvg({ [m.grupo]: 1 }, m.costas ? "costas" : "frente")}<span>${h(m.nome)}</span></div>`).join("")}</div></div>` : ""}`}
+    <div class="col" style="gap:10px"><div class="entre"><span class="rot">${exs.length} exercícios</span>${editar ? `<a class="btn peq" href="#/ficha/${f.id}">Pronto</a>` : ""}</div>
+      ${exs.map((e, i) => `<div class="ex-card">
+        ${editar ? `<span class="col" style="gap:2px;align-items:center"><button class="ico" style="width:32px;height:28px;border:0;background:none" data-acao="moverEx" data-id="${e.id}" data-dir="-1" aria-label="Subir"${i === 0 ? " disabled" : ""}>${ico("cima", 16)}</button>
+          <button class="ico" style="width:32px;height:28px;border:0;background:none" data-acao="moverEx" data-id="${e.id}" data-dir="1" aria-label="Descer"${i === exs.length - 1 ? " disabled" : ""}>${ico("baixo", 16)}</button></span>` : ""}
+        <a href="#/ex/${e.id}" class="ex-card-ft" aria-label="${h(e.nome)}">${exImg(e.nome)}${seloMusculo(e.nome)}</a>
+        <a href="#/ex/${e.id}" class="col" style="flex:1;gap:4px;min-width:0;color:inherit;text-decoration:none">
+          <span class="mini mudo">${i + 1} · ${h(musculosDe(e.nome).map((m) => m.nome).slice(0, 2).join(", ") || "Exercício")}</span>
+          <b class="ex-card-nome">${h(e.nome)}</b>
+          <span class="peq mudo">${e.series} séries • ${h(e.reps)} reps${e.carga_prevista ? " • " + kg(e.carga_prevista) : ""}</span></a>
+        ${editar ? `<a href="#/ex/${e.id}" class="mudo" aria-label="Editar">${ico("lapis", 18)}</a>` : ""}</div>`).join("") || `<div class="vazio">Nenhum exercício ainda.</div>`}
       <a class="btn" href="#/ex/novo/${f.id}">${ico("mais", 18)} Adicionar exercício</a>
     </div>
-    <button class="btn perigo" data-acao="apagarFicha" data-id="${f.id}">${ico("lixo", 18)} Apagar ficha</button>
+    ${editar ? `<button class="btn perigo" data-acao="apagarFicha" data-id="${f.id}">${ico("lixo", 18)} Apagar ficha</button>` : ""}
   </section>
-  <div class="rodape"><div><button class="btn pri" data-acao="iniciar" data-ficha="${f.id}" ${exs.length ? "" : "disabled"}>${ico("play", 18)} Iniciar este treino</button></div></div>`);
+  ${editar ? "" : `<div class="rodape"><div><button class="btn pri grande" data-acao="iniciar" data-ficha="${f.id}" ${exs.length ? "" : "disabled"}>${ico("play", 20)} Iniciar treino</button></div></div>`}`);
+  };
+  desenhar();
+  // imagens que ainda não estão no aparelho: busca e redesenha quando chegarem
+  const hash = location.hash;
+  if (await carregarMidia(exs.map((e) => e.nome)) && location.hash === hash) desenhar(true);
 }
 mudancas.fichaCampo = async (el) => {
   q(await sb.from("fichas").update({ [el.dataset.campo]: el.value.trim(), atualizado_em: new Date().toISOString() }).eq("id", el.dataset.id));

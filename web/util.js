@@ -15,7 +15,7 @@ export const limpeza = { fn: null };  // parar timers ao trocar de tela
 
 // Telas das abas ficam guardadas na memória: ao voltar para uma aba ela aparece na hora
 // e se atualiza sozinha quando os dados novos chegam.
-const ABAS = new Set(["#/hoje", "#/evolucao", "#/semana", "#/avaliacao", "#/clientes"]);
+const ABAS = new Set(["#/hoje", "#/evolucao", "#/semana", "#/avaliacao", "#/clientes", "#/perfil"]);
 const guardadas = new Map();
 let mostrandoGuardada = null;
 const chaveTela = () => (location.hash.replace(/^#\/?$/, "") || "#/hoje");
@@ -35,7 +35,7 @@ export function render(html) {
   mostrandoGuardada = null;
   app().innerHTML = html; window.scrollTo(0, 0);
 }
-export function renderSemRolar(html) { const y = window.scrollY; app().innerHTML = html; window.scrollTo(0, y); }
+export function renderSemRolar(html) { app().classList.remove("trocando"); const y = window.scrollY; app().innerHTML = html; window.scrollTo(0, y); }
 export function ir(hash) { if (location.hash === hash) window.dispatchEvent(new HashChangeEvent("hashchange")); else location.hash = hash; }
 
 export function h(v) {
@@ -174,6 +174,8 @@ const P = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
   chave: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2 20 3M17 6l3 3M14 9l2 2"/>',
   lista: '<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
+  relogio: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
+  regua: '<rect x="2" y="8" width="20" height="8" rx="2"/><path d="M6 8v3M10 8v4M14 8v3M18 8v4"/>',
   sair: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
 };
 export function ico(nome, tam = 20, extra = "") {
@@ -183,8 +185,8 @@ export function botaoVoltar(hash) {
   return `<a class="ico" href="${hash}" aria-label="Voltar">${ico("voltar")}</a>`;
 }
 export function nav(atual) {
-  const it = [["#/hoje", "casa", "Hoje"], ["#/evolucao", "sobe", "Evolução"], ["#/semana", "fogo", "Semana"], ["#/avaliacao", "pessoa", "Avaliação"]];
-  if (sessao.perfil?.papel === "admin") it.push(["#/clientes", "chave", "Clientes"]);
+  const it = [["#/hoje", "casa", "Hoje"], ["#/evolucao", "sobe", "Evolução"], ["#/semana", "fogo", "Semana"], ["#/avaliacao", "regua", "Avaliação"], ["#/perfil", "pessoa", "Perfil"]];
+  if (atual === "#/clientes") atual = "#/perfil";
   return `<nav class="nav"><div style="grid-template-columns:repeat(${it.length},minmax(0,1fr))">${it.map(([href, i, t]) => `<a href="${href}" class="${atual === href ? "at" : ""}">${ico(i, 22)}${t}</a>`).join("")}</div></nav>`;
 }
 
@@ -301,7 +303,7 @@ const COSTAS = [
   ["Pernas", [[52, 210], [76, 210], [74, 246], [64, 258], [54, 254], [48, 230]]],
   ["Pernas", [[49, 264], [64, 263], [67, 290], [60, 308], [54, 308], [47, 287]]],
 ];
-export function corpoSvg(pct = {}) {
+export function corpoSvg(pct = {}, lado = null) {
   const cor = (g, peso = 1) => {
     const p = Math.max(0, Math.min(1, (pct[g] || 0) * peso));
     return p ? `fill="#C6F432" fill-opacity="${(0.25 + 0.75 * p).toFixed(2)}"` : `fill="#3A3F47"`;
@@ -313,8 +315,9 @@ export function corpoSvg(pct = {}) {
       <path d="${contorno}" fill="#24272C"/><path d="${contorno}" fill="#24272C" transform="translate(160,0) scale(-1,1)"/>
       <ellipse cx="80" cy="29" rx="16" ry="20" fill="#24272C"/>
       <g stroke="#0E0F11" stroke-width="1.6" stroke-linejoin="round">${metade}<g transform="translate(160,0) scale(-1,1)">${metade}</g></g>
-      <text x="80" y="368" text-anchor="middle" font-size="13" font-family="Inter, Arial, sans-serif" fill="#9AA0A8">${rotulo}</text></g>`;
+      ${rotulo ? `<text x="80" y="368" text-anchor="middle" font-size="13" font-family="Inter, Arial, sans-serif" fill="#9AA0A8">${rotulo}</text>` : ""}</g>`;
   };
+  if (lado) return `<svg viewBox="0 0 160 352" aria-hidden="true">${figura(0, lado === "costas" ? COSTAS : FRENTE, "")}</svg>`;
   return `<svg class="corpo" viewBox="0 0 340 374" role="img" aria-label="Músculos treinados na semana">${figura(4, FRENTE, "Frente")}${figura(176, COSTAS, "Costas")}</svg>`;
 }
 

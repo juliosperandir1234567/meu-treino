@@ -214,3 +214,27 @@ drop policy if exists "ler dicas" on public.dicas_exercicio;
 create policy "ler dicas" on public.dicas_exercicio for select to authenticated using ((select public.conta_ativa()));
 grant select on public.dicas_exercicio to authenticated;
 grant select, insert, update, delete on public.dicas_exercicio to service_role;
+
+-- ---------- Imagem de cada exercício (banco livre free-exercise-db), escolhida por IA uma vez e reaproveitada ----------
+create table if not exists public.exercicio_midia (
+  chave text primary key,            -- nome normalizado
+  nome text not null,
+  ref text,                          -- id no free-exercise-db (null = sem imagem parecida)
+  primarios jsonb not null default '[]'::jsonb,
+  criado_em timestamptz not null default now()
+);
+alter table public.exercicio_midia enable row level security;
+drop policy if exists "ler midia" on public.exercicio_midia;
+create policy "ler midia" on public.exercicio_midia for select to authenticated using ((select public.conta_ativa()));
+grant select on public.exercicio_midia to authenticated;
+grant select, insert, update, delete on public.exercicio_midia to service_role;
+
+-- ---------- Foto de perfil (arquivo em fotos/<uid>/perfil/...) ----------
+alter table public.perfis add column if not exists foto_path text;
+create or replace function public.definir_minha_foto(caminho text) returns void
+language sql volatile security definer set search_path = '' as $$
+  update public.perfis set foto_path = nullif(btrim(coalesce(caminho, '')), '')
+  where id = auth.uid() and (caminho is null or caminho like auth.uid()::text || '/perfil/%');
+$$;
+revoke execute on function public.definir_minha_foto(text) from public, anon;
+grant execute on function public.definir_minha_foto(text) to authenticated;

@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
       case "apagar": {
         if (!id) return json({ erro: "Falta o cliente." }, 400);
         // apaga as fotos dele e depois a conta (os dados saem junto, em cascata)
-        for (const pasta of ["equipamentos", "treinos", "prints"]) {
+        for (const pasta of ["equipamentos", "treinos", "prints", "perfil"]) {
           const { data: arqs } = await adm.storage.from("fotos").list(`${id}/${pasta}`, { limit: 1000 });
           if (arqs?.length) await adm.storage.from("fotos").remove(arqs.map((a) => `${id}/${pasta}/${a.name}`));
         }
