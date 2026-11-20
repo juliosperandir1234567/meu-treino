@@ -283,3 +283,20 @@ nav.nav a.at { color: var(--ac); }
 .perfil-cam { background: var(--ac); color: #FFFFFF; }
 .rodape .btn.grande { box-shadow: 0 10px 28px rgba(37,99,235,.3); }
 .letra.xg { box-shadow: 0 8px 22px rgba(37,99,235,.25); }
+
+/* semana: plano e "como foi" em destaque */
+.sug { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.sug.quase { flex-direction: row; align-items: center; gap: 10px; padding: 10px 12px; }
+.sug-carga { display: flex; align-items: center; gap: 4px; white-space: nowrap; font-family: "Space Grotesk", sans-serif; }
+.sug-carga span { opacity: .75; text-decoration: line-through; font-size: 14px; }
+.sug-carga b { font-size: 22px; }
+.cartao.destaque { border-color: rgba(37,99,235,.25); box-shadow: 0 8px 26px rgba(37,99,235,.10); }
+.mini-stats > div { background: var(--s2); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
+.mini-stats b { font-family: "Space Grotesk", sans-serif; font-size: 22px; }
+
+/* menu fixo embaixo */
+nav.nav { background: #FFFFFF; border-top: 1px solid var(--borda); padding: 6px 8px calc(var(--base) + 6px); pointer-events: auto; box-shadow: 0 -4px 16px rgba(15,23,42,.05); }
+nav.nav > div { background: none; -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; border-radius: 0; padding: 0; max-width: 520px; box-shadow: none; }
+nav.nav a { border-radius: 12px; padding: 6px 0 4px; font-size: 11px; }
+nav.nav a.at { background: none; color: var(--ac); }
+nav.nav a.at svg { background: rgba(37,99,235,.12); border-radius: 10px; padding: 3px 12px; box-sizing: content-box; }

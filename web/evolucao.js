@@ -195,14 +195,19 @@ export async function dadosSemana() {
   ordem.sort((a, b) => (exAtual[b] ? 1 : 0) - (exAtual[a] ? 1 : 0));
 
   // sugestão de carga: bateu o máximo de repetições em todas as séries na última vez
-  const sugestoes = [];
+  const sugestoes = [], quase = [];
   for (const e of exs) {
     const meta = metaReps(e.reps); if (!meta) continue;
     const xs = hist.filter((x) => x.exercicio_id === e.id); if (!xs.length) continue;
     const ult = xs.filter((x) => x.sessao_id === xs[0].sessao_id && x.equipamento_opcao === xs[0].equipamento_opcao);
     const carga = Number(ult[0].carga);
-    if (!carga || ult.length < e.series) continue;
-    if (!ult.every((x) => Number(x.carga) >= carga && (x.reps || 0) >= meta.max)) continue;
+    if (!carga) continue;
+    const bateu = ult.length >= e.series && ult.every((x) => Number(x.carga) >= carga && (x.reps || 0) >= meta.max);
+    if (!bateu) {
+      const faltam = ult.reduce((a, x) => a + Math.max(0, meta.max - (x.reps || 0)), 0) + Math.max(0, e.series - ult.length) * meta.max;
+      if (faltam > 0) quase.push({ e, carga, faltam, meta });
+      continue;
+    }
     let ignorado = false;
     try { ignorado = !!localStorage.getItem(chaveManter(e.id, carga)); } catch { /* */ }
     if (ignorado) continue;
@@ -210,7 +215,7 @@ export async function dadosSemana() {
   }
 
   return {
-    ini, fimSem, seq, sugestoes, usarVolume,
+    ini, fimSem, seq, sugestoes, quase: quase.sort((a, b) => a.faltam - b.faltam), usarVolume,
     treinos: daSemana.length, treinosAnt: daAnterior.length,
     series: ser.length, seriesAnt: serAnt.length,
     volume: vol(ser), volumeAnt: vol(serAnt),
@@ -239,6 +244,14 @@ function pctTxt(a, b) {
   return `<span class="mini ${p > 0 ? "ac" : "lar"}" style="font-weight:600">${p > 0 ? "▲ +" : "▼ "}${p}%</span>`;
 }
 
+function resumoFrase(d) {
+  if (!d.treinos) return d.treinosAnt ? "Ainda sem treino nesta semana. Bora começar!" : "Seu resumo aparece aqui depois do primeiro treino";
+  if (!d.volumeAnt) return `${d.treinos} treino${d.treinos === 1 ? "" : "s"} feito${d.treinos === 1 ? "" : "s"} nesta semana`;
+  const pct = Math.round(((d.volume - d.volumeAnt) / d.volumeAnt) * 100);
+  if (pct >= 5) return `Você levantou ${pct}% a mais que na semana passada`;
+  if (pct <= -5) return `${Math.abs(pct)}% abaixo da semana passada até agora`;
+  return "No mesmo ritmo da semana passada";
+}
 export async function telaSemana() {
   const d = await dadosSemana();
   const { ini, fimSem, seq, sugestoes } = d;
@@ -254,20 +267,31 @@ export async function telaSemana() {
   render(`<section class="tela">
     <div class="entre" style="align-items:flex-end"><div class="col" style="gap:4px"><span class="peq mudo">${ini.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })} a ${fimSem.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}</span><h1>Sua semana</h1></div>
       <span class="chip" style="color:var(--txt)">${ico("fogo", 14, 'style="color:var(--lar);vertical-align:-2px"')} ${seq} semana${seq === 1 ? "" : "s"} seguida${seq === 1 ? "" : "s"}</span></div>
-    ${sugestoes.slice(0, 3).map((s) => `<div class="cartao"><div class="linha"><span class="ac">${ico("sobe", 18)}</span><span class="rot ac">Sugestão de carga</span></div>
-      <span style="line-height:1.45">Você fez <b>${s.meta.max} repetições em todas as séries</b> de ${h(s.e.nome)}. Na próxima, tente <b>${kg(s.nova)}</b> (antes ${kg(s.carga)}).</span>
-      <div class="linha"><button class="btn pri peq" data-acao="aplicarSug" data-id="${s.e.id}" data-c="${s.nova}">Aplicar</button><button class="btn peq" data-acao="manterSug" data-id="${s.e.id}" data-c="${s.carga}">Manter ${kg(s.carga)}</button></div></div>`).join("")}
-    <div class="grade3"><div class="stat"><span class="mini mudo">Treinos</span><span class="v">${d.treinos}</span>${pctTxt(d.treinos, d.treinosAnt)}</div>
-      <div class="stat"><span class="mini mudo">Volume</span><span class="v">${volumeTxt(d.volume)}</span>${pctTxt(d.volume, d.volumeAnt)}</div>
-      <div class="stat"><span class="mini mudo">Recordes</span><span class="v ac">${d.recordes}</span><span class="mini mudo">nesta semana</span></div></div>
-    <div class="cartao"><div class="entre"><b>${unid} por dia</b><span class="legenda"><span><i style="background:#C9D3E1"></i>Passada</span><span><i style="background:var(--ac)"></i>Esta</span></span></div>
+    <div class="heroi">
+      <div class="entre"><span class="rot ac">Plano desta semana</span><span class="mini mudo">pelo seu último treino</span></div>
+      <h2 class="heroi-tit">${sugestoes.length ? `Hora de subir a carga em ${sugestoes.length} exercício${sugestoes.length === 1 ? "" : "s"}` : d.quase.length ? "Mantenha as cargas e busque mais repetições" : "Treine para receber sugestões de carga"}</h2>
+      ${sugestoes.slice(0, 4).map((s) => `<div class="sug">
+        <div class="entre" style="gap:10px;align-items:flex-start"><div class="col" style="gap:2px;min-width:0"><b>${h(s.e.nome)}</b><span class="mini mudo">Fez ${s.meta.max} repetições em todas as séries</span></div>
+          <div class="sug-carga"><span>${kg(s.carga)}</span>${ico("seta", 16)}<b>${kg(s.nova)}</b></div></div>
+        <div class="grade2"><button class="btn pri peq" data-acao="aplicarSug" data-id="${s.e.id}" data-c="${s.nova}">Subir para ${kg(s.nova)}</button><button class="btn peq" data-acao="manterSug" data-id="${s.e.id}" data-c="${s.carga}">Manter ${kg(s.carga)}</button></div></div>`).join("")}
+      ${d.quase.length && sugestoes.length < 3 ? `<div class="col" style="gap:8px"><span class="mini mudo" style="font-weight:600">QUASE LÁ</span>
+        ${d.quase.slice(0, 3 - Math.min(sugestoes.length, 2)).map((x) => `<div class="sug quase"><div class="col" style="gap:2px;min-width:0;flex:1"><b>${h(x.e.nome)}</b><span class="mini mudo">${kg(x.carga)} · faça ${x.meta.max} reps em todas as séries para subir</span></div>
+          <span class="chip">faltam ${x.faltam} rep${x.faltam === 1 ? "" : "s"}</span></div>`).join("")}</div>` : ""}
+    </div>
+    <div class="cartao destaque">
+      <div class="col" style="gap:4px"><span class="rot ac">Como foi sua semana</span>
+        <h2>${resumoFrase(d)}</h2></div>
+      <div class="grade3 mini-stats"><div><span class="mini mudo">Treinos</span><b>${d.treinos}</b>${pctTxt(d.treinos, d.treinosAnt)}</div>
+        <div><span class="mini mudo">Volume</span><b>${volumeTxt(d.volume)}</b>${pctTxt(d.volume, d.volumeAnt)}</div>
+        <div><span class="mini mudo">Recordes</span><b class="ac">${d.recordes}</b><span class="mini mudo">na semana</span></div></div>
+      <div class="entre"><b class="peq">${unid} por dia</b><span class="legenda"><span><i style="background:#C9D3E1"></i>Passada</span><span><i style="background:var(--ac)"></i>Esta</span></span></div>
       ${d.series || d.seriesAnt ? barrasSemana(d.dia, d.diaAnt, ["S", "T", "Q", "Q", "S", "S", "D"]) : `<span class="mudo peq">Faça um treino para ver o gráfico.</span>`}</div>
+    <div class="cartao destaque"><div class="entre"><b>Exercícios: passada × esta</b><span class="mini mudo">melhor série</span></div>
+      ${comp ? `<div class="comp"><span class="mini mudo">Exercício</span><span class="mini mudo num">Passada</span><span class="mini mudo num">Esta</span>${comp}</div>` : `<span class="mudo peq">Ainda não há séries nestas duas semanas.</span>`}</div>
     <div class="cartao"><div class="entre"><b>Músculos da semana</b><span class="mini mudo">mais forte = mais séries</span></div>
       ${corpoSvg(pctGrupos(d.grupos))}
       ${linhasGrupo}
       <span class="mini mudo"><span style="display:inline-block;width:2px;height:10px;background:var(--txt);opacity:.55;vertical-align:-1px"></span> semana passada · números = séries feitas / meta da semana</span></div>
-    <div class="cartao"><div class="entre"><b>Exercícios: passada × esta</b><span class="mini mudo">melhor série</span></div>
-      ${comp ? `<div class="comp"><span class="mini mudo">Exercício</span><span class="mini mudo num">Passada</span><span class="mini mudo num">Esta</span>${comp}</div>` : `<span class="mudo peq">Ainda não há séries nestas duas semanas.</span>`}</div>
     <a class="item" href="#/conquistas"><span class="letra g">🏆</span><span class="col" style="flex:1;gap:2px"><b>Calendário e conquistas</b><span class="mini mudo">Seus dias de treino e as medalhas que já ganhou</span></span><span class="mudo">${ico("seta", 18)}</span></a>
     <a class="btn pri blk" href="#/publicar-semana">${ico("share", 18)} Compartilhar minha semana</a>
   </section>${nav("#/semana")}`);
