@@ -26,6 +26,16 @@ function delta(atual, antes, bomSubir = true, un = "") {
 }
 
 // ---------- EVOLUÇÃO ----------
+// título do gráfico: o nome como está; só acrescenta "(cm)" se o nome não trouxer unidade
+function tituloMedida(nome) {
+  const temUnidade = /\(\s*(cm|mm|kg|m|%)\s*\)/i.test(nome) || /peso|imc|gordura|altura|dobra/i.test(nome);
+  return temUnidade ? nome : nome + " (cm)";
+}
+// rótulo embaixo do ponto: "Janeiro/2026" → "Jan/26"; sem rótulo, a data (dd/mm)
+function rotuloCurto(a) {
+  const m = (a.rotulo || "").match(/^(\p{L}{3})\p{L}*\s*\/\s*\d{0,2}(\d{2})$/u);
+  return m ? `${m[1]}/${m[2]}` : dataCurta(a.data + "T12:00");
+}
 let medidaSel = null;
 export async function telaEvolucao(aba, exNome) {
   // a aba de exercícios não usa as avaliações: não busca à toa
@@ -33,25 +43,28 @@ export async function telaEvolucao(aba, exNome) {
   let corpo = "";
   if (aba === "medidas") {
     const ult = avs[avs.length - 1], ant = avs[avs.length - 2];
-    const ombro = (a) => a ? a.medidas[achar(a.medidas, "ombro")] ?? null : null;
+    // sem medida de ombro: usa o tórax/peito (também mostra se o tronco está crescendo)
+    const temOmbro = avs.some((a) => achar(a.medidas || {}, "ombro"));
+    const rotOmbro = temOmbro ? "Ombro" : "Tórax";
+    const ombro = (a) => a ? a.medidas[temOmbro ? achar(a.medidas, "ombro") : achar(a.medidas, "torax", "peito")] ?? null : null;
     const cint = (a) => a ? a.medidas[achar(a.medidas, "cintura", "abdomen")] ?? null : null;
     const chaves = [...new Set(avs.flatMap((a) => Object.keys(a.medidas || {})))];
     if (!medidaSel || !chaves.includes(medidaSel)) medidaSel = achar(Object.fromEntries(chaves.map((k) => [k, 1])), "braco direito", "braco") || chaves[0];
     corpo = !avs.length ? vazioAv() : `
       <div class="grade3">
         <div class="stat"><span class="mini mudo">Braço</span><span class="v">${fmt(valorBraco(ult?.medidas))}</span>${delta(valorBraco(ult?.medidas), valorBraco(ant?.medidas), true, " cm")}</div>
-        <div class="stat"><span class="mini mudo">Ombro</span><span class="v">${fmt(ombro(ult))}</span>${delta(ombro(ult), ombro(ant), true, " cm")}</div>
+        <div class="stat"><span class="mini mudo">${rotOmbro}</span><span class="v">${fmt(ombro(ult))}</span>${delta(ombro(ult), ombro(ant), true, " cm")}</div>
         <div class="stat"><span class="mini mudo">Cintura</span><span class="v">${fmt(cint(ult))}</span>${delta(cint(ult), cint(ant), false, " cm")}</div></div>
-      ${chaves.length ? `<div class="cartao"><div class="entre"><b>${h(medidaSel)} (cm)</b>
-        <select class="inp" style="width:auto;min-height:36px;font-size:13px" onchange="window.__medida(this.value)" aria-label="Escolher medida">${chaves.map((k) => `<option ${k === medidaSel ? "selected" : ""}>${h(k)}</option>`).join("")}</select></div>
-        ${grafico(avs.map((a) => a.medidas[medidaSel] ?? null), avs.map((a) => dataCurta(a.data + "T12:00")))}</div>` : ""}`;
+      ${chaves.length ? `<div class="cartao"><div class="col" style="gap:8px"><b>${h(tituloMedida(medidaSel))}</b>
+        <select class="inp" style="min-height:40px;font-size:14px" onchange="window.__medida(this.value)" aria-label="Escolher medida">${chaves.map((k) => `<option ${k === medidaSel ? "selected" : ""}>${h(k)}</option>`).join("")}</select></div>
+        ${grafico(avs.map((a) => a.medidas[medidaSel] ?? null), avs.map(rotuloCurto), { datas: avs.map((a) => a.data + "T12:00") })}</div>` : ""}`;
   } else if (aba === "peso") {
     const comPeso = avs.filter((a) => a.peso != null);
     const ult = comPeso[comPeso.length - 1], ant = comPeso[comPeso.length - 2];
     corpo = !comPeso.length ? vazioAv() : `
       <div class="grade2"><div class="stat"><span class="mini mudo">Peso</span><span class="v">${kg(ult.peso)}</span>${delta(ult.peso, ant?.peso, false, " kg")}</div>
         <div class="stat"><span class="mini mudo">Gordura</span><span class="v">${ult.gordura != null ? fmt(ult.gordura) + " %" : "—"}</span>${delta(ult.gordura, ant?.gordura, false, " pts")}</div></div>
-      <div class="cartao"><b>Peso (kg)</b>${grafico(comPeso.map((a) => Number(a.peso)), comPeso.map((a) => dataCurta(a.data + "T12:00")))}</div>`;
+      <div class="cartao"><b>Peso (kg)</b>${grafico(comPeso.map((a) => Number(a.peso)), comPeso.map(rotuloCurto), { datas: comPeso.map((a) => a.data + "T12:00") })}</div>`;
   } else {
     const desde = new Date(Date.now() - 120 * 864e5).toISOString();
     const ser = q(await sb.from("series_feitas").select("exercicio_nome, carga, reps, sessao_id, feita_em").gte("feita_em", desde).order("feita_em"));

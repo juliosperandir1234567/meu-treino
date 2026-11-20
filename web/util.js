@@ -208,18 +208,33 @@ export function grupoDe(nome) {
 export const METAS = { "Ombro": 16, "Braço": 16, "Costas": 12, "Peito": 10, "Pernas": 10, "Abdômen": 8 };
 
 // ---------- gráfico de linha simples ----------
-export function grafico(valores, rotulos = []) {
-  const v = valores.filter((x) => x !== null && x !== undefined);
-  if (v.length < 2) return `<div class="mudo peq">Precisa de pelo menos 2 registros para o gráfico.</div>`;
-  const W = 320, H = 120, p = 10;
-  const min = Math.min(...v), max = Math.max(...v), d = max - min || 1;
-  const pts = valores.map((x, i) => x === null ? null : [p + (i * (W - 2 * p)) / (valores.length - 1), H - p - ((x - min) / d) * (H - 2 * p)]).filter(Boolean);
-  const ult = pts[pts.length - 1];
-  return `<svg class="graf" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Gráfico de ${fmt(v[0])} a ${fmt(v[v.length - 1])}">
-    <line x1="0" y1="${p}" x2="${W}" y2="${p}" stroke="#E1E7F0"/><line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#E1E7F0"/><line x1="0" y1="${H - p}" x2="${W}" y2="${H - p}" stroke="#E1E7F0"/>
-    <polyline points="${pts.map((x) => x.join(",")).join(" ")}" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
-    <circle cx="${ult[0]}" cy="${ult[1]}" r="4" fill="#2563EB"/></svg>
-    ${rotulos.length ? `<div class="entre mini mudo"><span>${h(rotulos[0])}</span><span>${h(rotulos[rotulos.length - 1])}</span></div>` : ""}`;
+// Gráfico de linha: escala com folga (pequenas mudanças não parecem um tombo), valor e data em cada ponto
+// e, se vierem as datas reais (opc.datas), a distância entre os pontos segue o tempo.
+export function grafico(valores, rotulos = [], opc = {}) {
+  const idx = valores.map((_, i) => i).filter((i) => valores[i] !== null && valores[i] !== undefined && !isNaN(Number(valores[i])));
+  if (idx.length < 2) return `<div class="mudo peq">Precisa de pelo menos 2 registros para o gráfico.</div>`;
+  const W = 320, H = 160, pl = 16, pr = 16, pt = 24, pb = 30;
+  const v = idx.map((i) => Number(valores[i]));
+  let min = Math.min(...v), max = Math.max(...v);
+  const folga = Math.max((max - min) * 0.35, Math.abs(max) * 0.05, 0.5);
+  min -= folga; max += folga;
+  const ts = opc.datas ? opc.datas.map((s) => new Date(s).getTime()) : null;
+  const pos = (i) => (ts ? ts[i] : i);
+  const x0 = pos(idx[0]), x1 = pos(idx[idx.length - 1]);
+  const X = (i) => pl + ((pos(i) - x0) / ((x1 - x0) || 1)) * (W - pl - pr);
+  const Y = (val) => pt + (1 - (val - min) / (max - min)) * (H - pt - pb);
+  const pts = idx.map((i) => ({ x: X(i), y: Y(Number(valores[i])), v: Number(valores[i]), r: rotulos[i] }));
+  const nb = (x) => String(Math.round(x * 100) / 100).replace(".", ",");
+  const ancora = (x) => (x < 40 ? "start" : x > W - 40 ? "end" : "middle");
+  const todos = pts.length <= 7;
+  const marcados = todos ? pts : [pts[0], pts[pts.length - 1]];
+  return `<svg class="graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de ${nb(v[0])} a ${nb(v[v.length - 1])}">
+    <line x1="${pl}" y1="${H - pb}" x2="${W - pr}" y2="${H - pb}" stroke="#E1E7F0"/>
+    <polyline points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    ${pts.map((p, k) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${k === pts.length - 1 ? 5 : 3.5}" fill="${k === pts.length - 1 ? "#2563EB" : "#FFFFFF"}" stroke="#2563EB" stroke-width="2"/>`).join("")}
+    ${marcados.map((p) => `<text x="${p.x.toFixed(1)}" y="${(p.y - 10).toFixed(1)}" text-anchor="${ancora(p.x)}" font-size="12" font-weight="700" fill="#0F172A">${nb(p.v)}</text>`).join("")}
+    ${marcados.filter((p) => p.r).map((p) => `<text x="${p.x.toFixed(1)}" y="${H - 10}" text-anchor="${ancora(p.x)}" font-size="11" fill="#64748B">${h(p.r)}</text>`).join("")}
+  </svg>`;
 }
 
 // ---------- som e tela ligada ----------
