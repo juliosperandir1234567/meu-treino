@@ -205,6 +205,25 @@ export function grupoDe(nome) {
   for (const [g, chaves] of GRUPOS) if (chaves.some((c) => n.includes(c))) return g;
   return "Outros";
 }
+// Nome do treino pelos exercícios (sem IA): grupos que mais aparecem. Ex.: "Perna e Ombro", "Peito, Ombro e Tríceps"
+const BICEPS = ["rosca", "biceps", "martelo", "scott"], TRICEPS = ["triceps", "testa", "frances", "coice", "mergulho", "pulley corda"];
+const NOME_GRUPO = { Pernas: "Perna", Ombro: "Ombro", Costas: "Costas", Peito: "Peito", "Abdômen": "Abdômen" };
+export function nomeDoTreino(nomes) {
+  const cont = {};
+  (nomes || []).forEach((nome) => {
+    let g = grupoDe(nome);
+    if (g === "Braço") { const n = normal(nome); g = TRICEPS.some((c) => n.includes(c)) ? "Tríceps" : BICEPS.some((c) => n.includes(c)) ? "Bíceps" : "Braço"; }
+    else g = NOME_GRUPO[g] || null;
+    if (g) cont[g] = (cont[g] || 0) + 1;
+  });
+  const total = Object.values(cont).reduce((a, b) => a + b, 0);
+  if (!total) return "";
+  let gs = Object.keys(cont).sort((a, b) => cont[b] - cont[a]);
+  // entra quem tem peso na ficha; abdômen só se for parte grande do treino
+  gs = gs.filter((g, i) => i === 0 || (cont[g] >= 2 || cont[g] / total >= 0.25) && (g !== "Abdômen" || cont[g] / total >= 0.3)).slice(0, 3);
+  if (gs.includes("Bíceps") && gs.includes("Tríceps")) gs = gs.filter((g) => g !== "Tríceps").map((g) => (g === "Bíceps" ? "Braço" : g));
+  return gs.length === 1 ? gs[0] : gs.slice(0, -1).join(", ") + " e " + gs[gs.length - 1];
+}
 export const METAS = { "Ombro": 16, "Braço": 16, "Costas": 12, "Peito": 10, "Pernas": 10, "Abdômen": 8 };
 
 // ---------- gráfico de linha simples ----------

@@ -1,7 +1,7 @@
 // Atualizar por print: lê o print com IA, mostra o que mudou e salva. Também lê avaliação física.
 import {
   sb, acoes, mudancas, render, ir, h, toast, q, num, kg, normal, ico, botaoVoltar,
-  reduzir, blobBase64, enviarFoto, carregarImagem,
+  reduzir, blobBase64, enviarFoto, carregarImagem, nomeDoTreino,
 } from "./util.js";
 import { lerTexto, lerAvaliacoesTexto, campoDe } from "./texto.js";
 
@@ -184,7 +184,7 @@ async function prepararRevisao() {
   const usadas = new Set(fichas.map((f) => f.letra));
   const tl = (P.res.titulo || "").match(/treino\s+([A-Z])\b/i);
   P.novaLetra = tl && !usadas.has(tl[1].toUpperCase()) ? tl[1].toUpperCase() : ("ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").find((l) => !usadas.has(l)) || "X");
-  P.novaNome = (P.res.titulo || "").replace(/treino\s+[A-Z]\b\s*[-–·:]?\s*/i, "").trim();
+  P.novaNome = (P.res.titulo || "").replace(/treino\s+[A-Z]\b\s*[-–·:]?\s*/i, "").trim() || nomeDoTreino(lista.map((p) => p.nome));
   P.marc = {};
 }
 function calcularDiferencas() {

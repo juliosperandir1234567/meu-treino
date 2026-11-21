@@ -1,7 +1,7 @@
 // Meu Treino — rotas, login, tela Hoje, fichas e edição de exercícios.
 import {
   sb, configOk, sessao, acoes, limpeza, mudancas, render, renderSemRolar, corpoSvg, mostrarGuardada, esquecerTelas, ir, h, toast, erro, q, num, fmt, kg,
-  dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe, abrirFolha, fecharFolha,
+  dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe, abrirFolha, fecharFolha, nomeDoTreino,
 } from "./util.js";
 import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino, guardarParaSemInternet } from "./treino.js";
 import { pendentes } from "./fila.js";
@@ -230,6 +230,10 @@ export async function carregarFichas() {
     const cont = {};
     meus.forEach((e) => { const g = grupoDe(e.nome); if (g !== "Outros") cont[g] = (cont[g] || 0) + 1; });
     f.grupos = Object.keys(cont).sort((a, b) => cont[b] - cont[a]).slice(0, 3);
+    if (!(f.nome || "").trim() && meus.length) {
+      const auto = nomeDoTreino(f.nomes);
+      if (auto) { f.nome = auto; sb.from("fichas").update({ nome: auto }).eq("id", f.id).then(() => {}, () => {}); }
+    }
   });
   return fichas;
 }
@@ -373,7 +377,8 @@ async function telaFicha(id) {
       ${editar ? "" : `<a class="ico" href="#/ficha/${f.id}?editar=1" aria-label="Editar ficha">${ico("lapis", 18)}</a>`}</div>
     ${editar ? `<div class="cartao"><div class="grade2" style="grid-template-columns:80px 1fr">
       <label class="campo">Letra<input class="inp" maxlength="3" value="${h(f.letra)}" data-muda="fichaCampo" data-id="${f.id}" data-campo="letra"></label>
-      <label class="campo">Nome<input class="inp" placeholder="Ex.: Ombro e tríceps" value="${h(f.nome)}" data-muda="fichaCampo" data-id="${f.id}" data-campo="nome"></label></div>
+      <label class="campo">Nome<input id="nomeFicha" class="inp" placeholder="Ex.: Ombro e tríceps" value="${h(f.nome)}" data-muda="fichaCampo" data-id="${f.id}" data-campo="nome"></label></div>
+      ${exs.length ? `<button class="btn peq" data-acao="sugerirNome" data-id="${f.id}" data-nome="${h(nomeDoTreino(exs.map((e) => e.nome)))}">✨ Sugerir nome pelos exercícios</button>` : ""}
       <span class="mini mudo">Use as setas para mudar a ordem. Toque no exercício para editar.</span></div>` : `
     <div class="chips-linha"><span class="chip">${ico("relogio", 13, 'style="vertical-align:-2px"')} ~${minutos} min</span><span class="chip">${exs.length} exercícios</span><span class="chip">${series} séries</span>
       <span class="chip">Atualizada ${new Date(f.atualizado_em).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span></div>
@@ -400,6 +405,12 @@ async function telaFicha(id) {
   const hash = location.hash;
   if (await carregarMidia(exs.map((e) => e.nome)) && location.hash === hash) desenhar(true);
 }
+acoes.sugerirNome = async (el) => {
+  const nome = el.dataset.nome; if (!nome) return toast("Não reconheci os exercícios para sugerir um nome");
+  const inp = document.getElementById("nomeFicha"); if (inp) inp.value = nome;
+  q(await sb.from("fichas").update({ nome, atualizado_em: new Date().toISOString() }).eq("id", el.dataset.id));
+  toast(`Nome: ${nome}`);
+};
 mudancas.fichaCampo = async (el) => {
   q(await sb.from("fichas").update({ [el.dataset.campo]: el.value.trim(), atualizado_em: new Date().toISOString() }).eq("id", el.dataset.id));
   toast("Salvo");
