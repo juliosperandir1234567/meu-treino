@@ -346,3 +346,6 @@ nav.nav a.at svg { background: rgba(37,99,235,.12); border-radius: 10px; padding
 .tabela.comp-av tbody tr td { border-bottom: 1px solid var(--borda); }
 .tabela.comp-av th:first-child, .tabela.comp-av td:first-child { width: 33%; padding-left: 0; }
 .tabela.comp-av th.cdif, .tabela.comp-av td.cdif { width: 14%; padding-right: 0; }
+.hist-sem summary { display: flex; justify-content: space-between; align-items: center; cursor: pointer; list-style: none; }
+.hist-sem summary::-webkit-details-marker { display: none; }
+.hist-sem-l { padding: 8px 0; border-top: 1px solid var(--borda); gap: 8px; }
