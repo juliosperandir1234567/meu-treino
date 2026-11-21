@@ -1,5 +1,5 @@
 // Perfil: foto, nome, acesso e números de quem treina. Para o admin, atalho para o painel de clientes.
-import { sb, sessao, acoes, render, h, q, fmt, toast, ico, nav, fotoUrl, reduzir, enviarFoto, escolherFoto } from "./util.js";
+import { sb, sessao, acoes, render, h, q, fmt, toast, ico, nav, fotoUrl, reduzir, enviarFoto, escolherFoto, inicioSemana } from "./util.js";
 
 export function iniciais(nome, email) {
   const base = (nome || "").trim() || (email || "").split("@")[0];
@@ -16,7 +16,9 @@ export async function avatarHtml(tam = 44) {
 
 export async function telaPerfil() {
   const p = sessao.perfil || {};
-  const [av, est] = await Promise.all([avatarHtml(112), sb.rpc("minhas_estatisticas").then((r) => r.data || {}, () => ({}))]);
+  const [av, est, semana] = await Promise.all([avatarHtml(112), sb.rpc("minhas_estatisticas").then((r) => r.data || {}, () => ({})),
+    sb.from("sessoes").select("id, series_feitas(count)").gte("inicio", inicioSemana().toISOString())
+      .then((r) => (r.data || []).filter((s) => s.series_feitas?.[0]?.count > 0).length, () => null)]);
   const admin = p.papel === "admin";
   const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
   const dias = p.acesso_ate ? Math.round((new Date(p.acesso_ate + "T12:00") - new Date(hoje + "T12:00")) / 864e5) : null;
@@ -31,7 +33,7 @@ export async function telaPerfil() {
       ${acesso}
     </div>
     <div class="grade3"><div class="stat"><span class="mini mudo">Treinos</span><span class="v">${Number(est.treinos) || 0}</span></div>
-      <div class="stat" title="Soma de carga × repetições de todas as séries"><span class="mini mudo">Peso levantado</span>${(() => { const v = Math.round(Number(est.volume) || 0).toLocaleString("pt-BR") + " kg"; return `<span class="v" style="white-space:nowrap;${v.length > 8 ? "font-size:17px" : v.length > 6 ? "font-size:19px" : ""}">${v}</span>`; })()}<span class="mini mudo">desde o início</span></div>
+      <div class="stat"><span class="mini mudo">Esta semana</span><span class="v">${semana ?? "—"}</span></div>
       <div class="stat"><span class="mini mudo">Maior carga</span><span class="v">${est.carga_max ? fmt(est.carga_max) + " kg" : "—"}</span></div></div>
     <div class="col" style="gap:8px">
       <a class="item" href="#/conquistas"><span class="letra">🏆</span><span class="col" style="flex:1;gap:2px"><b>Calendário e conquistas</b><span class="mini mudo">Seus dias de treino e medalhas</span></span><span class="mudo">${ico("seta", 18)}</span></a>
