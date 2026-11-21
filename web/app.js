@@ -1,7 +1,7 @@
 // Meu Treino — rotas, login, tela Hoje, fichas e edição de exercícios.
 import {
   sb, configOk, sessao, acoes, limpeza, mudancas, render, renderSemRolar, corpoSvg, mostrarGuardada, esquecerTelas, ir, h, toast, erro, q, num, fmt, kg,
-  dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe,
+  dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe, abrirFolha, fecharFolha,
 } from "./util.js";
 import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino, guardarParaSemInternet } from "./treino.js";
 import { pendentes } from "./fila.js";
@@ -113,7 +113,35 @@ sb.auth.onAuthStateChange((_ev, s) => {
 (async () => {
   if (configOk) { const { data } = await sb.auth.getSession(); sessao.user = data.session?.user || null; }
   rota();
+  setTimeout(perguntarTreinoAberto, 600);
 })();
+
+// Treino ficou aberto e a pessoa voltou ao app: pergunta se continua ou finaliza.
+let saiuEm = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) saiuEm = Date.now();
+  else if (saiuEm && Date.now() - saiuEm > 60000) perguntarTreinoAberto();
+});
+function perguntarTreinoAberto() {
+  const t = treinoAtivo();
+  if (!t || !sessao.user || document.getElementById("folha")) return;
+  const ini = t.inicio ? new Date(t.inicio) : null;
+  const min = ini ? Math.round((Date.now() - ini) / 60000) : null;
+  const tempo = min === null ? "" : min >= 60 ? `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}` : `${min} min`;
+  abrirFolha(`<div class="col" style="gap:14px">
+    <span class="rot ac">Treino em andamento</span>
+    <h2 style="margin:0">${h(t.fichaNome || "Treino")}</h2>
+    ${ini ? `<span class="peq mudo">Começou às ${ini.toTimeString().slice(0, 5)} · há ${tempo}${(t.feitas || []).length ? ` · ${t.feitas.length} séries marcadas` : ""}</span>` : ""}
+    <p style="margin:0">Deseja continuar ou finalizar o treino?</p>
+    <button class="btn pri blk grande" data-acao="treinoContinuar">${ico("play", 20)} Continuar treino</button>
+    <button class="btn blk" data-acao="treinoFinalizar">Finalizar treino</button></div>`, "Treino em andamento");
+}
+acoes.treinoContinuar = () => { fecharFolha(); if (location.hash !== "#/treino") ir("#/treino"); };
+acoes.treinoFinalizar = () => {
+  fecharFolha();
+  try { sessionStorage.setItem("finalizar-ao-abrir", "1"); } catch { /* */ }
+  if (location.hash === "#/treino") { sessionStorage.removeItem("finalizar-ao-abrir"); acoes.finalizar(); } else ir("#/treino");
+};
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
 // ---------- configuração e login ----------

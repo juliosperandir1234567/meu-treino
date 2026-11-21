@@ -104,6 +104,8 @@ export async function telaTreino() {
   if (!D.exs.length) { toast("Essa ficha não tem exercícios"); return ir(`#/ficha/${t.fichaId}`); }
   manterTelaLigada(true);
   desenharTreino();
+  let pedirFim = false; try { pedirFim = !!sessionStorage.getItem("finalizar-ao-abrir"); sessionStorage.removeItem("finalizar-ao-abrir"); } catch { /* */ }
+  if (pedirFim) setTimeout(() => acoes.finalizar(), 50);
   let avisou10 = false, avisou0 = false, ultimoAte = null;
   const timer = setInterval(() => {
     const tt = treinoAtivo(); if (!tt) return;
@@ -188,7 +190,7 @@ function desenharTreino(rolar = false) {
     <div id="cardDescanso" class="cartao ${fim ? "pronto ac-borda" : ""}">
       <div class="entre"><div class="col" style="gap:2px"><span id="rotDescanso" class="mini mudo">${fim ? "Descanso acabou · hora da próxima série" : "Descanso"}</span>
         <span id="cron" class="cron">${fim ? "Bora!" : mmss(resta)}</span></div>
-        <div class="linha" style="gap:6px"><button class="btn peq" data-acao="ajusteDescanso" data-s="-15">−15s</button><button class="btn peq" data-acao="ajusteDescanso" data-s="15">+15s</button><button class="btn peq cla" data-acao="pularDescanso">Pular</button></div></div>
+        <div class="linha" style="gap:6px"><button class="btn peq" data-acao="ajusteDescanso" data-s="-15">−15s</button><button class="btn peq" data-acao="ajusteDescanso" data-s="15">+15s</button><button class="btn peq pri" data-acao="pularDescanso">Continuar treino</button></div></div>
       <div class="barra"><div id="barDescanso" style="width:${fim ? 0 : Math.max(0, (resta / (t.descansoTotal || 90)) * 100)}%"></div></div></div>` : "";
 
   const porSessao = new Map();
