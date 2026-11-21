@@ -113,12 +113,15 @@ export async function telaTreino() {
     if (!tt.descansoAte) return;
     const resta = (new Date(tt.descansoAte) - Date.now()) / 1000;
     const c = document.getElementById("cron"), card = document.getElementById("cardDescanso"), rot = document.getElementById("rotDescanso");
-    if (c) c.textContent = (resta < 0 ? "+" : "") + mmss(resta);
-    if (card) card.classList.toggle("passou", resta < 0);
-    if (card) card.classList.toggle("lar-borda", resta < 0);
-    if (rot) rot.textContent = resta < 0 ? "Descanso passou do tempo" : "Descanso";
+    // acabou há mais de 2 min: some sozinho (o tempo real de descanso continua sendo medido pela próxima série)
+    if (resta < -120) { tt.descansoAte = null; salvarTreinoAtivo(tt); document.getElementById("cardDescanso")?.remove(); return; }
+    const fim = resta <= 0;
+    if (c) c.textContent = fim ? "Bora!" : mmss(resta);
+    if (card) card.classList.toggle("pronto", fim);
+    if (card) card.classList.toggle("ac-borda", fim);
+    if (rot) rot.textContent = fim ? "Descanso acabou · hora da próxima série" : "Descanso";
     const bar = document.getElementById("barDescanso");
-    if (bar) { const tot = tt.descansoTotal || 90; bar.style.width = `${Math.max(0, Math.min(100, (resta / tot) * 100))}%`; bar.style.background = resta < 0 ? "var(--lar)" : "var(--ac)"; if (resta < 0) bar.style.width = "100%"; }
+    if (bar) { const tot = tt.descansoTotal || 90; bar.style.width = `${fim ? 0 : Math.max(0, Math.min(100, (resta / tot) * 100))}%`; }
     if (resta <= 10 && resta > 0 && !avisou10) { avisou10 = true; bip(1); }
     if (resta <= 0 && !avisou0) { avisou0 = true; bip(3); }
   }, 1000);
@@ -178,13 +181,15 @@ function desenharTreino(rolar = false) {
       <div class="col" style="gap:2px"><b>Abaixo do previsto</b><span class="peq mudo">${a.txt}</span></div>
       <button class="ico" style="width:32px;height:32px;margin-left:auto" data-acao="fecharAviso" data-id="${a.id}" aria-label="Fechar aviso">✕</button></div></div>`).join("");
 
-  const resta = t.descansoAte ? (new Date(t.descansoAte) - Date.now()) / 1000 : null;
+  let resta = t.descansoAte ? (new Date(t.descansoAte) - Date.now()) / 1000 : null;
+  if (resta !== null && resta < -120) { t.descansoAte = null; salvarTreinoAtivo(t); resta = null; }
+  const fim = resta !== null && resta <= 0;
   const descanso = t.descansoAte ? `
-    <div id="cardDescanso" class="cartao ${resta < 0 ? "passou lar-borda" : ""}">
-      <div class="entre"><div class="col" style="gap:2px"><span id="rotDescanso" class="mini ${resta < 0 ? "lar" : "mudo"}">${resta < 0 ? "Descanso passou do tempo" : "Descanso"}</span>
-        <span id="cron" class="cron">${(resta < 0 ? "+" : "") + mmss(resta)}</span></div>
+    <div id="cardDescanso" class="cartao ${fim ? "pronto ac-borda" : ""}">
+      <div class="entre"><div class="col" style="gap:2px"><span id="rotDescanso" class="mini mudo">${fim ? "Descanso acabou · hora da próxima série" : "Descanso"}</span>
+        <span id="cron" class="cron">${fim ? "Bora!" : mmss(resta)}</span></div>
         <div class="linha" style="gap:6px"><button class="btn peq" data-acao="ajusteDescanso" data-s="-15">−15s</button><button class="btn peq" data-acao="ajusteDescanso" data-s="15">+15s</button><button class="btn peq cla" data-acao="pularDescanso">Pular</button></div></div>
-      <div class="barra"><div id="barDescanso" style="width:${resta < 0 ? 100 : Math.max(0, (resta / (t.descansoTotal || 90)) * 100)}%;${resta < 0 ? "background:var(--lar)" : ""}"></div></div></div>` : "";
+      <div class="barra"><div id="barDescanso" style="width:${fim ? 0 : Math.max(0, (resta / (t.descansoTotal || 90)) * 100)}%"></div></div></div>` : "";
 
   const porSessao = new Map();
   [...D.hist.filter((x) => x.exercicio_id === ex.id)].reverse().forEach((x) => {

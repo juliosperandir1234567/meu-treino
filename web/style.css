@@ -74,7 +74,7 @@ input.inp:focus, select.inp:focus, textarea.inp:focus { outline: 2px solid var(-
 .ok { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--borda); background: var(--s2); color: var(--fraco); display: flex; align-items: center; justify-content: center; }
 .serie.feita .ok { background: var(--ac); color: var(--ac-txt); border: 0; }
 .cron { font-family: "Space Grotesk", sans-serif; font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.passou .cron { color: var(--lar); }
+.pronto .cron { color: var(--ac); }
 .exs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .exs::-webkit-scrollbar { display: none; }
 .exs button { flex: 0 0 auto; min-width: 44px; height: 36px; border-radius: 10px; border: 1px solid var(--borda); background: var(--s1); color: var(--mudo); font-weight: 600; font-size: 13px; }
