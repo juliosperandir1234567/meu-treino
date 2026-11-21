@@ -193,10 +193,10 @@ export function nav(atual) {
 
 // ---------- grupos musculares (para o resumo da semana) ----------
 const GRUPOS = [
-  ["Ombro", ["desenvolvimento", "elevacao lateral", "elevacao frontal", "ombro", "crucifixo inverso", "face pull", "remada alta", "arnold"]],
+  ["Ombro", ["pec deck inverso", "voador inverso", "peck deck inverso", "desenvolvimento", "elevacao lateral", "elevacao frontal", "ombro", "crucifixo inverso", "face pull", "remada alta", "arnold"]],
   ["Braço", ["rosca", "triceps", "biceps", "testa", "frances", "coice", "martelo", "scott", "mergulho"]],
   ["Costas", ["puxada", "remada", "pulldown", "pull down", "barra fixa", "pullover", "serrote", "lombar", "graviton"]],
-  ["Peito", ["supino", "crucifixo", "voador", "peck", "crossover", "cross over", "flexao", "peitoral", "chest"]],
+  ["Peito", ["pec deck", "supino", "crucifixo", "voador", "peck", "crossover", "cross over", "flexao", "peitoral", "chest"]],
   ["Pernas", ["agachamento", "leg", "extensora", "flexora", "adutora", "abdutora", "stiff", "panturrilha", "gluteo", "glute", "hack", "afundo", "bulgaro", "terra", "elevacao pelvica", "sumo", "passada"]],
   ["Abdômen", ["abdominal", "prancha", "abdomen", "infra", "obliquo", "crunch"]],
 ];
@@ -218,6 +218,18 @@ export function nomeDoTreino(nomes) {
   });
   const total = Object.values(cont).reduce((a, b) => a + b, 0);
   if (!total) return "";
+  // treino misturado (vários grupos, nenhum dominante): Superiores / Corpo todo
+  const sup = ["Peito", "Costas", "Ombro", "Bíceps", "Tríceps", "Braço"].filter((g) => cont[g]);
+  const gruposSup = new Set(sup.map((g) => (["Bíceps", "Tríceps"].includes(g) ? "Braço" : g))).size;
+  const maior = Math.max(...Object.values(cont));
+  if (gruposSup >= 4 && maior / total < 0.5) return cont.Perna ? "Corpo todo" : "Superiores";
+  // só perna: diz qual parte
+  if (Object.keys(cont).every((g) => g === "Perna" || g === "Abdômen") && cont.Perna) {
+    const ns = nomes.map(normal);
+    const quad = ns.some((n) => /extensora|agachamento|hack|leg press|afundo|bulgaro|passada/.test(n));
+    const post = ns.some((n) => /flexora|stiff|terra|gluteo|glute|elevacao pelvica|abdutora/.test(n));
+    return quad && post ? "Perna completa" : quad ? "Perna · Quadríceps" : post ? "Posterior e Glúteo" : "Perna";
+  }
   let gs = Object.keys(cont).sort((a, b) => cont[b] - cont[a]);
   // entra quem tem peso na ficha; abdômen só se for parte grande do treino
   gs = gs.filter((g, i) => i === 0 || (cont[g] >= 2 || cont[g] / total >= 0.25) && (g !== "Abdômen" || cont[g] / total >= 0.3)).slice(0, 3);
