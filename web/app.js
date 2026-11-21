@@ -230,9 +230,12 @@ export async function carregarFichas() {
     const cont = {};
     meus.forEach((e) => { const g = grupoDe(e.nome); if (g !== "Outros") cont[g] = (cont[g] || 0) + 1; });
     f.grupos = Object.keys(cont).sort((a, b) => cont[b] - cont[a]).slice(0, 3);
-    if (!(f.nome || "").trim() && meus.length) {
+    // nome automático: fichas sem nome, e todas as que não foram mexidas depois desta mudança
+    // (quem editar o nome depois atualiza atualizado_em e o nome dela não é mais trocado)
+    const antigas = !f.atualizado_em || f.atualizado_em < "2026-11-21T23:30:00Z";
+    if (meus.length && (!(f.nome || "").trim() || antigas)) {
       const auto = nomeDoTreino(f.nomes);
-      if (auto) { f.nome = auto; sb.from("fichas").update({ nome: auto }).eq("id", f.id).then(() => {}, () => {}); }
+      if (auto && auto !== f.nome) { f.nome = auto; sb.from("fichas").update({ nome: auto }).eq("id", f.id).then(() => {}, () => {}); }
     }
   });
   return fichas;
