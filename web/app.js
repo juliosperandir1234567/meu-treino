@@ -134,9 +134,11 @@ function perguntarTreinoAberto() {
     ${ini ? `<span class="peq mudo">Começou às ${ini.toTimeString().slice(0, 5)} · há ${tempo}${(t.feitas || []).length ? ` · ${t.feitas.length} séries marcadas` : ""}</span>` : ""}
     <p style="margin:0">Deseja continuar ou finalizar o treino?</p>
     <button class="btn pri blk grande" data-acao="treinoContinuar">${ico("play", 20)} Continuar treino</button>
-    <button class="btn blk" data-acao="treinoFinalizar">Finalizar treino</button></div>`, "Treino em andamento");
+    <button class="btn blk" data-acao="treinoFinalizar">Finalizar treino</button>
+    <button class="btn blk perigo" data-acao="treinoCancelar">Cancelar treino</button></div>`, "Treino em andamento");
 }
 acoes.treinoContinuar = () => { fecharFolha(); if (location.hash !== "#/treino") ir("#/treino"); };
+acoes.treinoCancelar = () => { fecharFolha(); acoes.cancelarTreino(); };
 acoes.treinoFinalizar = () => {
   fecharFolha();
   try { sessionStorage.setItem("finalizar-ao-abrir", "1"); } catch { /* */ }

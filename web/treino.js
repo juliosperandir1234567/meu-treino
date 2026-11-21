@@ -206,7 +206,7 @@ function desenharTreino(rolar = false) {
     <div class="entre mini mudo"><span>Primeira: <b style="color:var(--txt)">${kg(histPts[0].c)}</b></span><span>Melhor: <b class="ac">${kg(Math.max(...histPts.map((x) => x.c)))}</b></span></div></div>` : "";
   const html = `<section class="tela">
     <div class="topo">${botaoVoltar("#/hoje")}<div class="tit" style="align-items:center"><b class="num" style="font-size:17px">${h(t.fichaNome)}</b>
-      <span class="peq mudo">Início ${hora(D.s.inicio)} · <span id="decorrido">${mmss((Date.now() - new Date(D.s.inicio)) / 1000)}</span> de treino</span></div><span style="width:44px"></span></div>
+      <span class="peq mudo">Início ${hora(D.s.inicio)} · <span id="decorrido">${mmss((Date.now() - new Date(D.s.inicio)) / 1000)}</span> de treino</span></div><button class="ico" data-acao="cancelarTreino" aria-label="Cancelar treino" title="Cancelar treino">✕</button></div>
     <div class="col" style="gap:6px"><div class="entre mini mudo"><span>Exercício ${t.idx + 1} de ${n} · ${pct}% feito</span>
       <button class="btn peq" style="min-height:32px" data-acao="listaExs">${ico("lista", 15)} Ver todos</button></div><div class="barra"><div style="width:${pct}%"></div></div>
       <span id="filaInfo" class="fila-info" ${pendentes() ? "" : "hidden"}>Sem internet · ${pendentes()} registros guardados no celular</span></div>
@@ -369,6 +369,15 @@ acoes.ajusteDescanso = (el) => {
   salvarTreinoAtivo(t); desenharTreino();
 };
 acoes.pularDescanso = () => { const t = treinoAtivo(); t.descansoAte = null; salvarTreinoAtivo(t); desenharTreino(); };
+// cancela sem finalizar: apaga o treino e as séries marcadas (não conta no histórico)
+acoes.cancelarTreino = () => {
+  const t = treinoAtivo(); if (!t) return ir("#/hoje");
+  const n = (t.feitas || []).length;
+  if (!confirm(n ? `Cancelar este treino? As ${n} séries marcadas serão apagadas e ele não conta no histórico.` : "Cancelar este treino?")) return;
+  enfileirar({ tipo: "del", tab: "sessoes", id: t.sessaoId });
+  salvarTreinoAtivo(null); D = null;
+  toast("Treino cancelado"); ir("#/hoje");
+};
 acoes.finalizar = async () => {
   const t = treinoAtivo();
   if (!D.feitas.length) {
