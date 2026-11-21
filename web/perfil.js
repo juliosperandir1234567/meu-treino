@@ -23,13 +23,14 @@ function inicioSemanaTreino(d = new Date()) {
 }
 const kgBR = (v) => Math.round(Number(v) || 0).toLocaleString("pt-BR") + " kg";
 const valorStat = (v) => `<span class="v" style="white-space:nowrap;${v.length > 9 ? "font-size:16px" : v.length > 7 ? "font-size:18px" : ""}">${v}</span>`;
-// séries das últimas 8 semanas, agrupadas por semana (a primeira é a atual)
+// séries das últimas 8 semanas, agrupadas por semana (a primeira é a atual).
+// Só conta treino finalizado: treino em andamento ou largado no meio não entra.
 async function semanasDeTreino() {
   const agora = new Date(), ini = inicioSemanaTreino(agora);
   const desde = new Date(ini); desde.setDate(desde.getDate() - 7 * 7);
   const linhas = [];
   for (let de = 0; ; de += 1000) {
-    const r = q(await sb.from("series_feitas").select("sessao_id, carga, reps, feita_em").gte("feita_em", desde.toISOString()).order("feita_em").range(de, de + 999));
+    const r = q(await sb.from("series_feitas").select("sessao_id, carga, reps, feita_em, sessoes!inner(fim)").not("sessoes.fim", "is", null).gte("feita_em", desde.toISOString()).order("feita_em").range(de, de + 999));
     linhas.push(...r); if (r.length < 1000) break;
   }
   const hoje = agora.toDateString();
