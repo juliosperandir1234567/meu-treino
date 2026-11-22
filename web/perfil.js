@@ -73,7 +73,7 @@ export async function telaPerfil() {
     </div>
     <div class="col" style="gap:8px">
       <div class="entre"><span class="rot">Esta semana</span><span class="mini mudo">zera domingo às 20h</span></div>
-      <div class="grade3">
+      <div class="grade3 stats-centro">
         <div class="stat"><span class="mini mudo">Treinos</span><span class="v">${semanas ? atual.treinos : "—"}</span><span class="mini mudo">${atual.hoje ? `${atual.hoje} hoje` : "nenhum hoje"}</span></div>
         <div class="stat"><span class="mini mudo">Peso total</span>${valorStat(semanas ? kgBR(atual.peso) : "—")}<span class="mini mudo">carga × reps</span></div>
         <div class="stat"><span class="mini mudo">Maior carga</span>${valorStat(atual.maior ? fmt(atual.maior) + " kg" : "—")}<span class="mini mudo">na semana</span></div></div>
