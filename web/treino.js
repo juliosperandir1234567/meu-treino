@@ -2,7 +2,7 @@
 import {
   sb, acoes, mudancas, limpeza, render, renderSemRolar, ir, h, toast, q, num, fmt, kg, hora, mmss, duracao,
   metaReps, ico, botaoVoltar, treinoAtivo, salvarTreinoAtivo, fotoUrl, fotoUrls, reduzir, enviarFoto, escolherFoto,
-  carregarImagem, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha, grafico,
+  carregarImagem, grupoDe, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha, grafico,
 } from "./util.js";
 import { exImg, carregarMidia, preencherMidia } from "./midia.js";
 import { idNovo, enfileirar, enviar, pendentes, aoMudarFila } from "./fila.js";
@@ -476,7 +476,7 @@ async function resumoSessao(id) {
   const descMedio = desc.length ? desc.reduce((a, b) => a + b, 0) / desc.length : null;
   return { s, ser, volume, recordes, descMedio };
 }
-export const volumeTxt = (v) => (v >= 1000 ? `${fmt(v / 1000)} t` : `${fmt(v, 0)} kg`);
+export const volumeTxt = (v) => `${Math.round(Number(v) || 0).toLocaleString("pt-BR")} kg`;
 
 export async function telaFim(id) {
   const { s, ser, volume, recordes, descMedio } = await resumoSessao(id);
@@ -560,6 +560,7 @@ acoes.fotoPublicar = async (el) => {
 
 // ícones (traço, grade 24×24) desenhados no canvas
 const ICONES = {
+  calendario: ["M8 2v4", "M16 2v4", "M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "M3 10h18"],
   halter: ["M6.5 6h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z", "M3.5 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z",
     "M16.5 6h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z", "M19.5 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z",
     "M8.5 12h7", "M1 12h1.5", "M21.5 12H23"],
@@ -599,6 +600,18 @@ async function desenharCard(r, foto) {
   } else ultimaImagem = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.92));
 }
 
+// grupos trabalhados nas séries feitas, do mais para o menos. Ex.: "Peito, Costas, Ombro e Braço"
+function gruposTreinados(ser) {
+  const cont = {};
+  ser.forEach((x) => {
+    let g = grupoDe(x.exercicio_nome || "");
+    if (g === "Outros") return;
+    if (g === "Pernas") g = "Perna";
+    cont[g] = (cont[g] || 0) + 1;
+  });
+  const gs = Object.keys(cont).sort((a, b) => cont[b] - cont[a]).slice(0, 4);
+  return gs.length <= 1 ? gs[0] || "" : gs.slice(0, -1).join(", ") + " e " + gs[gs.length - 1];
+}
 function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
   const M = 56;
   // fundo azul-escuro com brilhos
@@ -626,7 +639,8 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
     c.strokeStyle = "rgba(147,197,253,.5)"; c.lineWidth = 2; roundRect(c, W - M - tw, 54, tw, 70, 35); c.stroke();
     c.fillStyle = "#fff"; c.fillText(txt, W - M - tw + 36, 103);
   }
-  const titulo = nome.replace(/^Treino\s+\S+\s*·?\s*/, "") || nome;
+  const titulo = gruposTreinados(ser) || nome.replace(/^Treino\s+\S+\s*·?\s*/, "") || nome;
+  const nEx = new Set(ser.map((x) => x.exercicio_id || x.exercicio_nome)).size;
 
   // de baixo para cima: recorde, números, título, data
   let y = H - M;
@@ -654,7 +668,7 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
   // três cartões de números
   const sh = 146, stop = y - sh, gap = 18, livre = W - 2 * M - 2 * gap;
   const larg = [0.31, 0.29, 0.40].map((p) => p * livre);
-  const dados = [["cronometro", "Duração", s.fim ? duracao(s.inicio, s.fim) : "—"], ["halter", "Volume", volumeTxt(volume)], ["relogio", "Horário", `${hora(s.inicio)}–${hora(s.fim)}`]];
+  const dados = [["cronometro", "Duração", s.fim ? duracao(s.inicio, s.fim) : "—"], ["halter", "Volume", Math.round(volume).toLocaleString("pt-BR") + " kg"], ["calendario", "Data", new Date(s.inicio).toLocaleDateString("pt-BR")]];
   let x = M;
   dados.forEach(([ic, rot, v], i) => {
     const w = larg[i];
@@ -670,10 +684,10 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
   c.fillStyle = TXT; c.fillText(titulo, M + 6, y);
   y -= 112;
   c.font = `500 36px ${SANS}`; c.fillStyle = "#C9D3E6";
-  const dt = new Date(s.inicio).toLocaleDateString("pt-BR"), dw = c.measureText(dt).width;
+  const dt = `${ser.length} séries`, dw = c.measureText(dt).width;
   c.fillText(dt, M + 8, y);
   c.fillStyle = CIANO; c.beginPath(); c.arc(M + 8 + dw + 26, y - 12, 6, 0, Math.PI * 2); c.fill();
-  c.fillStyle = "#C9D3E6"; c.fillText(`${ser.length} séries`, M + 8 + dw + 52, y);
+  c.fillStyle = "#C9D3E6"; c.fillText(`${nEx} exercício${nEx === 1 ? "" : "s"}`, M + 8 + dw + 52, y);
 
   // faixa de luz entre a foto e os dados
   const yLuz = y - 90;
