@@ -595,7 +595,7 @@ function inicioSemanaTreino(d = new Date()) {
   return x;
 }
 // Dados extras do card: comparação com o último treino da mesma ficha e quantos treinos na semana
-async function extrasDoCard({ s, volume }) {
+async function extrasDoCard({ s, ser: serHoje }) {
   const extras = { link: location.host };
   const ini = new Date(s.inicio);
   const [semana, ant] = await Promise.all([
@@ -608,10 +608,11 @@ async function extrasDoCard({ s, volume }) {
   if (n) extras.semana = n;
   const antId = ant.data?.[0]?.id;
   if (antId) {
-    const ser = q(await sb.from("series_feitas").select("carga, reps").eq("sessao_id", antId));
-    const volAnt = ser.reduce((a, x) => a + (Number(x.carga) || 0) * (Number(x.reps) || 0), 0);
-    const dif = Math.round(volume - volAnt);
-    if (volAnt && dif) { extras.dif = dif; extras.ficha = ((s.ficha_nome || "").match(/Treino\s+\S+/) || ["treino"])[0]; }
+    const ant = q(await sb.from("series_feitas").select("exercicio_id, carga").eq("sessao_id", antId));
+    const maior = (xs, id) => Math.max(0, ...xs.filter((x) => x.exercicio_id === id).map((x) => Number(x.carga) || 0));
+    const ids = [...new Set(serHoje.map((x) => x.exercicio_id).filter(Boolean))];
+    const subiu = ids.filter((id) => { const a = maior(ant, id); return a > 0 && maior(serHoje, id) > a; }).length;   // mais carga que da última vez nesta ficha
+    if (subiu) extras.subiu = subiu;
   }
   return extras;
 }
@@ -727,16 +728,16 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
     y = top - 40;
   }
   // comparação com o último treino desta ficha
-  if (extras.dif) {
-    const sobe = extras.dif > 0;
-    c.font = `600 ${k ? 30 : 34}px ${SANS}`; c.fillStyle = sobe ? "#4ADE80" : "#C9D3E6";
-    c.fillText(`${sobe ? "▲" : "▼"} ${Math.abs(extras.dif).toLocaleString("pt-BR")} kg ${sobe ? "a mais" : "a menos"} que o último ${extras.ficha}`, M + 8, y);
+  if (extras.subiu) {
+    const n = extras.subiu;
+    c.font = `600 ${k ? 30 : 34}px ${SANS}`; c.fillStyle = "#4ADE80";
+    c.fillText(`▲ Subiu a carga em ${n} exercício${n > 1 ? "s" : ""}`, M + 8, y);
     y -= k ? 46 : 56;
   }
   // três cartões de números
   const sh = k ? 124 : 146, stop = y - sh, gap = 18, livre = W - 2 * M - 2 * gap;
   const larg = [0.31, 0.29, 0.40].map((p) => p * livre);
-  const dados = [["cronometro", "Duração", s.fim ? duracao(s.inicio, s.fim) : "—"], ["halter", "Volume", Math.round(volume).toLocaleString("pt-BR") + " kg"], ["calendario", "Data", new Date(s.inicio).toLocaleDateString("pt-BR")]];
+  const dados = [["cronometro", "Duração", s.fim ? duracao(s.inicio, s.fim) : "—"], recordes.length ? ["trofeu", "Recordes", String(recordes.length)] : ["halter", "Séries", String(ser.length)], ["calendario", "Data", new Date(s.inicio).toLocaleDateString("pt-BR")]];
   let x = M;
   dados.forEach(([ic, rot, v], i) => {
     const w = larg[i];
