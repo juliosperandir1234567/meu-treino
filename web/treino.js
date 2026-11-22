@@ -584,6 +584,34 @@ function caber(c, txt, max, peso, tam, fam) {
 const AZUL = "#3B82F6", CIANO = "#22D3EE", TXT = "#F2F5FA", MUDO = "#9AA6BC";
 const SANS = "Inter, sans-serif", TIT = "'Space Grotesk', Inter, sans-serif";
 
+// Semana de treino: de domingo 20h até o domingo seguinte 20h (igual ao Perfil)
+function inicioSemanaTreino(d = new Date()) {
+  const x = new Date(d); x.setHours(20, 0, 0, 0);
+  x.setDate(x.getDate() - x.getDay());
+  if (x > d) x.setDate(x.getDate() - 7);
+  return x;
+}
+// Dados extras do card: comparação com o último treino da mesma ficha e quantos treinos na semana
+async function extrasDoCard({ s, volume }) {
+  const extras = { link: location.host };
+  const ini = new Date(s.inicio);
+  const [semana, ant] = await Promise.all([
+    sb.from("sessoes").select("id, series_feitas(count)").not("fim", "is", null)
+      .gte("inicio", inicioSemanaTreino(ini).toISOString()).lte("inicio", s.inicio),
+    s.ficha_id ? sb.from("sessoes").select("id").eq("ficha_id", s.ficha_id).not("fim", "is", null)
+      .lt("inicio", s.inicio).order("inicio", { ascending: false }).limit(1) : Promise.resolve({ data: [] }),
+  ]);
+  const n = (semana.data || []).filter((x) => x.series_feitas?.[0]?.count > 0 || x.id === s.id).length;
+  if (n) extras.semana = n;
+  const antId = ant.data?.[0]?.id;
+  if (antId) {
+    const ser = q(await sb.from("series_feitas").select("carga, reps").eq("sessao_id", antId));
+    const volAnt = ser.reduce((a, x) => a + (Number(x.carga) || 0) * (Number(x.reps) || 0), 0);
+    const dif = Math.round(volume - volAnt);
+    if (volAnt && dif) { extras.dif = dif; extras.ficha = ((s.ficha_nome || "").match(/Treino\s+\S+/) || ["treino"])[0]; }
+  }
+  return extras;
+}
 async function desenharCard(r, foto) {
   const cv = document.getElementById("cv"); if (!cv) return;
   const W = 1080, H = formato === "story" ? 1920 : formato === "post" ? 1350 : 1080;
@@ -591,11 +619,12 @@ async function desenharCard(r, foto) {
   try { await document.fonts.ready; } catch { /* */ }
   let img = null;
   if (foto && formato !== "numeros") { try { img = await carregarImagem(foto); } catch { /* foto indisponível */ } }
-  pintar(cv.getContext("2d"), W, H, r, img, true);
+  const extras = await extrasDoCard(r).catch(() => ({ link: location.host }));
+  pintar(cv.getContext("2d"), W, H, r, img, true, extras);
   // a imagem que vai para o compartilhamento não leva o "toque para adicionar"
   if (!img && formato !== "numeros") {
     const off = document.createElement("canvas"); off.width = W; off.height = H;
-    pintar(off.getContext("2d"), W, H, r, null, false);
+    pintar(off.getContext("2d"), W, H, r, null, false, extras);
     ultimaImagem = await new Promise((ok) => off.toBlob(ok, "image/jpeg", 0.92));
   } else ultimaImagem = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.92));
 }
@@ -612,8 +641,9 @@ function gruposTreinados(ser) {
   const gs = Object.keys(cont).sort((a, b) => cont[b] - cont[a]).slice(0, 4);
   return gs.length <= 1 ? gs[0] || "" : gs.slice(0, -1).join(", ") + " e " + gs[gs.length - 1];
 }
-function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
+function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {}) {
   const M = 56;
+  const k = H < 1500;   // post/quadrado: tudo mais compacto para sobrar espaço para a foto
   // fundo azul-escuro com brilhos
   const fundo = c.createLinearGradient(0, 0, 0, H);
   fundo.addColorStop(0, "#071230"); fundo.addColorStop(0.55, "#06102A"); fundo.addColorStop(1, "#040A1C");
@@ -644,29 +674,64 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
 
   // de baixo para cima: recorde, números, título, data
   let y = H - M;
-  if (recordes.length) {
-    const r = recordes[0], ch = 150, top = y - ch;
+  // marca d'água com o link do app
+  if (extras.link) {
+    c.textAlign = "center"; c.fillStyle = "rgba(201,211,230,.55)"; c.font = `500 ${k ? 24 : 26}px ${SANS}`;
+    c.fillText(extras.link, W / 2, y + 22); c.textAlign = "left";
+    y -= k ? 22 : 30;
+  }
+  if (recordes.length > 1 && k) {
+    // compacto: até 3 recordes lado a lado
+    const rs = recordes.slice(0, 3), ch = 178, top = y - ch, cw = (W - 2 * M - 48) / rs.length;
     c.save(); c.shadowColor = "rgba(34,211,238,.35)"; c.shadowBlur = 36;
     c.fillStyle = "rgba(12,30,66,.75)"; roundRect(c, M, top, W - 2 * M, ch, 26); c.fill(); c.restore();
     const borda = c.createLinearGradient(M, 0, W - M, 0); borda.addColorStop(0, CIANO); borda.addColorStop(1, AZUL);
     c.strokeStyle = borda; c.lineWidth = 3; roundRect(c, M, top, W - 2 * M, ch, 26); c.stroke();
-    icone(c, "trofeu", M + 50, top + 43, 66, CIANO, 1.8);
+    icone(c, "trofeu", M + 26, top + 22, 38, CIANO, 2);
+    c.fillStyle = "#C9D3E6"; c.font = `700 24px ${SANS}`;
+    if ("letterSpacing" in c) c.letterSpacing = "4px";
+    c.fillText(`${rs.length} RECORDES PESSOAIS`, M + 80, top + 50);
+    if ("letterSpacing" in c) c.letterSpacing = "0px";
+    rs.forEach((r, i) => {
+      const x0 = M + 24 + i * cw;
+      if (i) { c.fillStyle = "rgba(255,255,255,.18)"; c.fillRect(x0 - 12, top + 78, 2, ch - 100); }
+      caber(c, r.nome, cw - 24, 600, 28, SANS); c.fillStyle = TXT; c.fillText(r.nome, x0 + 4, top + 108);
+      const val = `${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`;
+      caber(c, val, cw - 24, 700, 40, SANS); c.fillStyle = CIANO; c.fillText(val, x0 + 4, top + 154);
+    });
+    y = top - 34;
+  } else if (recordes.length) {
+    const rs = recordes.slice(0, 3), linha = 64, ch = 96 + rs.length * linha, top = y - ch;
+    c.save(); c.shadowColor = "rgba(34,211,238,.35)"; c.shadowBlur = 36;
+    c.fillStyle = "rgba(12,30,66,.75)"; roundRect(c, M, top, W - 2 * M, ch, 26); c.fill(); c.restore();
+    const borda = c.createLinearGradient(M, 0, W - M, 0); borda.addColorStop(0, CIANO); borda.addColorStop(1, AZUL);
+    c.strokeStyle = borda; c.lineWidth = 3; roundRect(c, M, top, W - 2 * M, ch, 26); c.stroke();
+    icone(c, "trofeu", M + 50, top + (ch - 66) / 2, 66, CIANO, 1.8);
     c.fillStyle = "rgba(255,255,255,.3)"; c.fillRect(M + 154, top + 38, 2, ch - 76);
     c.fillStyle = "#C9D3E6"; c.font = `700 28px ${SANS}`;
     if ("letterSpacing" in c) c.letterSpacing = "5px";
-    c.fillText(recordes.length > 1 ? `RECORDE PESSOAL  +${recordes.length - 1}` : "RECORDE PESSOAL", M + 190, top + 58);
+    c.fillText(rs.length > 1 ? `${rs.length} RECORDES PESSOAIS` : "RECORDE PESSOAL", M + 190, top + 62);
     if ("letterSpacing" in c) c.letterSpacing = "0px";
-    const val = `${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`;
-    c.font = `700 50px ${SANS}`; const vw = c.measureText(val).width;
-    const maxNome = W - 2 * M - 190 - 40 - vw - 28;
-    caber(c, r.nome, maxNome, 700, 50, SANS);
-    c.fillStyle = TXT; c.fillText(r.nome, M + 190, top + 118);
-    const nw = c.measureText(r.nome).width;
-    c.font = `700 50px ${SANS}`; c.fillStyle = CIANO; c.fillText(val, M + 190 + nw + 28, top + 118);
-    y = top - 48;
+    rs.forEach((r, i) => {
+      const yy = top + 62 + (i + 1) * linha;
+      const val = `${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`;
+      const tam = rs.length > 1 ? 42 : 50;
+      c.font = `700 ${tam}px ${SANS}`; const vw = c.measureText(val).width;
+      c.fillStyle = CIANO; c.fillText(val, W - M - 40 - vw, yy);
+      caber(c, r.nome, W - 2 * M - 190 - 40 - vw - 28, 700, tam, SANS);
+      c.fillStyle = TXT; c.fillText(r.nome, M + 190, yy);
+    });
+    y = top - 40;
+  }
+  // comparação com o último treino desta ficha
+  if (extras.dif) {
+    const sobe = extras.dif > 0;
+    c.font = `600 ${k ? 30 : 34}px ${SANS}`; c.fillStyle = sobe ? "#4ADE80" : "#C9D3E6";
+    c.fillText(`${sobe ? "▲" : "▼"} ${Math.abs(extras.dif).toLocaleString("pt-BR")} kg ${sobe ? "a mais" : "a menos"} que o último ${extras.ficha}`, M + 8, y);
+    y -= k ? 46 : 56;
   }
   // três cartões de números
-  const sh = 146, stop = y - sh, gap = 18, livre = W - 2 * M - 2 * gap;
+  const sh = k ? 124 : 146, stop = y - sh, gap = 18, livre = W - 2 * M - 2 * gap;
   const larg = [0.31, 0.29, 0.40].map((p) => p * livre);
   const dados = [["cronometro", "Duração", s.fim ? duracao(s.inicio, s.fim) : "—"], ["halter", "Volume", Math.round(volume).toLocaleString("pt-BR") + " kg"], ["calendario", "Data", new Date(s.inicio).toLocaleDateString("pt-BR")]];
   let x = M;
@@ -674,35 +739,47 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
     const w = larg[i];
     c.fillStyle = "rgba(15,30,62,.55)"; roundRect(c, x, stop, w, sh, 22); c.fill();
     c.strokeStyle = "rgba(96,165,250,.28)"; c.lineWidth = 2; roundRect(c, x, stop, w, sh, 22); c.stroke();
-    icone(c, ic, x + 28, stop + (sh - 60) / 2, 60, CIANO, 1.7);
-    c.fillStyle = "#C9D3E6"; c.font = `500 28px ${SANS}`; c.fillText(rot, x + 108, stop + 52);
-    caber(c, v, w - 108 - 18, 700, 50, SANS); c.fillStyle = TXT; c.fillText(v, x + 106, stop + 112);
+    const it = k ? 52 : 60;
+    icone(c, ic, x + 26, stop + (sh - it) / 2, it, CIANO, 1.7);
+    c.fillStyle = "#C9D3E6"; c.font = `500 ${k ? 26 : 28}px ${SANS}`; c.fillText(rot, x + it + 44, stop + (k ? 46 : 52));
+    caber(c, v, w - it - 44 - 16, 700, k ? 44 : 50, SANS); c.fillStyle = TXT; c.fillText(v, x + it + 42, stop + (k ? 98 : 112));
     x += w + gap;
   });
-  y = stop - 44;
-  caber(c, titulo, W - 2 * M, 700, 92, TIT);
+  y = stop - (k ? 36 : 44);
+  caber(c, titulo, W - 2 * M, 700, k ? 76 : 92, TIT);
   c.fillStyle = TXT; c.fillText(titulo, M + 6, y);
-  y -= 112;
-  c.font = `500 36px ${SANS}`; c.fillStyle = "#C9D3E6";
+  y -= k ? 92 : 112;
+  c.font = `500 ${k ? 32 : 36}px ${SANS}`; c.fillStyle = "#C9D3E6";
   const dt = `${ser.length} séries`, dw = c.measureText(dt).width;
   c.fillText(dt, M + 8, y);
   c.fillStyle = CIANO; c.beginPath(); c.arc(M + 8 + dw + 26, y - 12, 6, 0, Math.PI * 2); c.fill();
   c.fillStyle = "#C9D3E6"; c.fillText(`${nEx} exercício${nEx === 1 ? "" : "s"}`, M + 8 + dw + 52, y);
+  const selo = (sx, sy) => {
+    const st = `🔥 ${extras.semana}º treino da semana`; c.font = `700 ${k ? 28 : 30}px ${SANS}`;
+    const sw = c.measureText(st).width + 44, hh = k ? 54 : 58;
+    if (sx === null) sx = W - M - sw;
+    c.fillStyle = k ? "rgba(7,18,48,.82)" : "rgba(59,130,246,.18)"; roundRect(c, sx, sy, sw, hh, hh / 2); c.fill();
+    c.strokeStyle = "rgba(96,165,250,.6)"; c.lineWidth = 2; roundRect(c, sx, sy, sw, hh, hh / 2); c.stroke();
+    c.fillStyle = TXT; c.textBaseline = "middle"; c.fillText(st, sx + 22, sy + hh / 2 + 1); c.textBaseline = "alphabetic";
+  };
+  // no story o selo fica na linha das séries; no post vai por cima da foto (sobra mais espaço)
+  if (extras.semana && !k) selo(null, y - 44);
 
   // faixa de luz entre a foto e os dados
-  const yLuz = y - 90;
+  const yLuz = y - (k ? 70 : 90);
   const luz = c.createLinearGradient(0, 0, W, 0);
   luz.addColorStop(0, "rgba(59,130,246,0)"); luz.addColorStop(0.5, "rgba(59,130,246,.18)"); luz.addColorStop(1, "rgba(96,165,250,.7)");
   c.strokeStyle = luz; c.lineWidth = 2; c.beginPath(); c.moveTo(0, yLuz + 30); c.quadraticCurveTo(W * 0.6, yLuz + 10, W, yLuz - 40); c.stroke();
 
   // área da foto
-  const fx = M, fy = 170, fw = W - 2 * M, fh = yLuz - 30 - fy;
+  const fx = M, fy = k ? 156 : 170, fw = W - 2 * M, fh = yLuz - (k ? 20 : 30) - fy;
   if (formato === "numeros") {
     // sem foto: halter grande e discreto no espaço livre
     if (fh > 160) { const t = Math.min(fh * 0.9, 260); c.globalAlpha = 0.18; icone(c, "halter", W / 2 - t / 2, fy + (fh - t) / 2, t, CIANO, 1.2); c.globalAlpha = 1; }
+    if (extras.semana && k) selo(fx, fy);
     return;
   }
-  if (fh < 200) return;
+  if (fh < 200) { if (extras.semana && k) selo(null, fy); return; }
   if (img) {
     c.save(); roundRect(c, fx, fy, fw, fh, 36); c.clip();
     const esc = Math.max(fw / img.width, fh / img.height), w = img.width * esc, hh = img.height * esc;
@@ -714,7 +791,9 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
     c.save(); if (previa) c.setLineDash([10, 9]); c.strokeStyle = "rgba(148,163,184,.55)"; c.lineWidth = 2.5; roundRect(c, fx, fy, fw, fh, 36); c.stroke(); c.restore();
     const cy = fy + fh / 2;
     c.textAlign = "center";
-    if (previa) {
+    if (fh < 380) {   // pouco espaço: só um texto
+      c.fillStyle = TXT; c.font = `700 52px ${TIT}`; c.fillText(previa ? "Toque para adicionar foto" : "Treino concluído", W / 2, cy + 18);
+    } else if (previa) {
       icone(c, "camera", W / 2 - 60, cy - 160, 120, "#DCE6F5", 1.4);
       c.fillStyle = CIANO; c.beginPath(); c.arc(W / 2, cy - 160 + 65, 18, 0, Math.PI * 2); c.lineWidth = 6; c.strokeStyle = CIANO; c.stroke();
       c.fillStyle = TXT; c.font = `700 58px ${TIT}`; c.fillText("Sua foto do treino", W / 2, cy + 32);
@@ -725,6 +804,7 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa) {
     }
     c.textAlign = "left";
   }
+  if (extras.semana && k) selo(fx + 22, fy + 22);
 }
 export function definirImagem(b) { ultimaImagem = b; }
 export function roundRect(c, x, y, w, hh, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + hh, r); c.arcTo(x + w, y + hh, x, y + hh, r); c.arcTo(x, y + hh, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
