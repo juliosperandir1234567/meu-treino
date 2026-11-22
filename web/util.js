@@ -91,6 +91,13 @@ export function duracao(ini, fim) {
   const min = Math.round((new Date(fim) - new Date(ini)) / 60000);
   return min >= 60 ? `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}` : `${min} min`;
 }
+// Semana de treino: começa domingo às 20h (vale para o Perfil, o card e a volta para o Treino A)
+export function inicioSemanaTreino(d = new Date()) {
+  const x = new Date(d); x.setHours(20, 0, 0, 0);
+  x.setDate(x.getDate() - x.getDay());
+  if (x > d) x.setDate(x.getDate() - 7);
+  return x;
+}
 export function inicioSemana(d = new Date()) {
   const x = new Date(d); x.setHours(0, 0, 0, 0);
   const dia = (x.getDay() + 6) % 7; // segunda = 0

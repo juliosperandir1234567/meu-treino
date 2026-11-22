@@ -51,8 +51,12 @@ async function mensagemPara(uid: string, hoje: string) {
   if (ss.some((s: any) => s.inicio >= ini)) return null;   // já treinou hoje
   const { data: fichas } = await adm.from("fichas").select("id, letra, nome").eq("user_id", uid).order("ordem").order("letra");
   if (!fichas?.length) return { title: "Hora do treino 💪", body: "Bora treinar hoje? Abra o app e monte sua ficha.", url: "#/hoje" };
-  let prox = fichas[0];
-  const ult = (ss || []).find((s: any) => fichas.some((f: any) => f.id === s.ficha_id));
+  // semana nova (domingo 20h, horário de Brasília) recomeça no Treino A
+  const dow = new Date(hoje + "T12:00:00-03:00").getUTCDay();
+  const dom = new Date(new Date(hoje + "T20:00:00-03:00").getTime() - dow * 864e5);
+  if (dom.getTime() > Date.now()) dom.setTime(dom.getTime() - 7 * 864e5);
+  let prox = fichas.find((f: any) => f.letra === "A") || fichas[0];
+  const ult = (ss || []).find((s: any) => new Date(s.inicio).getTime() >= dom.getTime() && fichas.some((f: any) => f.id === s.ficha_id));
   if (ult) { const i = fichas.findIndex((f: any) => f.id === ult.ficha_id); prox = fichas[(i + 1) % fichas.length]; }
   const nome = `Treino ${prox.letra}${prox.nome ? " · " + prox.nome : ""}`;
   return { title: "Hora do treino 💪", body: `Hoje é dia de ${nome}. Bora?`, url: "#/hoje" };

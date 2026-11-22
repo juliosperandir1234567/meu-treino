@@ -1,7 +1,7 @@
 // Meu Treino — rotas, login, tela Hoje, fichas e edição de exercícios.
 import {
   sb, configOk, sessao, acoes, limpeza, mudancas, render, renderSemRolar, corpoSvg, mostrarGuardada, esquecerTelas, ir, h, toast, erro, q, num, fmt, kg,
-  dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe, abrirFolha, fecharFolha, nomeDoTreino,
+  dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe, abrirFolha, fecharFolha, nomeDoTreino, inicioSemanaTreino,
 } from "./util.js";
 import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino, guardarParaSemInternet } from "./treino.js";
 import { pendentes } from "./fila.js";
@@ -277,9 +277,10 @@ async function telaHoje() {
   if (!semanas.has(cur.getTime())) cur.setDate(cur.getDate() - 7);
   while (semanas.has(cur.getTime())) { seq++; cur.setDate(cur.getDate() - 7); }
 
-  // próximo treino: o seguinte ao último feito, na ordem da ficha
-  let prox = fichas[0];
-  const ult = recentes.find((s) => s.ficha_id && fichas.some((f) => f.id === s.ficha_id));
+  // próximo treino: o seguinte ao último feito nesta semana; semana nova (domingo 20h) recomeça no Treino A
+  let prox = fichas.find((f) => f.letra === "A") || fichas[0];
+  const iniTreino = inicioSemanaTreino();
+  const ult = recentes.find((s) => s.ficha_id && new Date(s.inicio) >= iniTreino && fichas.some((f) => f.id === s.ficha_id));
   if (ult) { const i = fichas.findIndex((f) => f.id === ult.ficha_id); prox = fichas[(i + 1) % fichas.length]; }
 
   const nomes = ["S", "T", "Q", "Q", "S", "S", "D"];
