@@ -350,3 +350,5 @@ nav.nav a.at svg { background: rgba(37,99,235,.12); border-radius: 10px; padding
 .hist-sem summary::-webkit-details-marker { display: none; }
 .hist-sem-l { padding: 8px 0; border-top: 1px solid var(--borda); gap: 8px; }
 .stats-centro .stat { align-items: center; text-align: center; }
+/* toque responde na hora no iPhone (sem esperar o "toque duplo para zoom") */
+a, button, input, select, label, summary, [data-acao] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }

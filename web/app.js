@@ -16,6 +16,8 @@ import { telaLembrete, desligarLembreteDoAparelho } from "./lembrete.js";
 
 // ---------- cliques e mudanças (delegação) ----------
 document.addEventListener("click", (e) => {
+  const aba = e.target.closest?.("nav.nav a");
+  if (aba) { aba.parentElement.querySelectorAll("a").forEach((x) => x.classList.toggle("at", x === aba)); }
   const el = e.target.closest("[data-acao]");
   if (!el) return;
   const f = acoes[el.dataset.acao];
@@ -184,7 +186,7 @@ acoes.sairDireto = async () => { limparDadosLocais(); salvarTreinoAtivo(null); a
 // ao sair: apaga o que é desta conta no celular (fila, telas e treinos guardados)
 function limparDadosLocais() {
   try {
-    Object.keys(localStorage).filter((k) => /^(fila-envio|hoje-html-|perfil-|treino-dados)/.test(k)).forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage).filter((k) => /^(fila-envio|hoje-html-|perfil-|treino-dados|telas-)/.test(k)).forEach((k) => localStorage.removeItem(k));
   } catch { /* */ }
 }
 acoes.verificarDeNovo = () => { sessao.perfil = null; rota(); };

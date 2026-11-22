@@ -18,18 +18,35 @@ export const limpeza = { fn: null };  // parar timers ao trocar de tela
 const ABAS = new Set(["#/hoje", "#/evolucao", "#/semana", "#/avaliacao", "#/clientes", "#/perfil"]);
 const guardadas = new Map();
 let mostrandoGuardada = null;
+// também ficam no celular: na primeira abertura do app a aba aparece na hora (e atualiza em seguida)
+const NO_CELULAR = new Set(["#/hoje", "#/evolucao", "#/semana", "#/avaliacao", "#/perfil"]);
+const chTelas = () => "telas-" + (sessao.user?.id || "");
+let telasDoUsuario = null;
+function lerTelasDoCelular() {
+  if (telasDoUsuario === chTelas()) return;
+  telasDoUsuario = chTelas();
+  try { Object.entries(JSON.parse(localStorage.getItem(chTelas()) || "{}")).forEach(([k, v]) => { if (!guardadas.has(k)) guardadas.set(k, v); }); } catch { /* */ }
+}
+let salvarTelasT = null;
+function salvarTelasNoCelular() {
+  clearTimeout(salvarTelasT);
+  salvarTelasT = setTimeout(() => {
+    try { localStorage.setItem(chTelas(), JSON.stringify(Object.fromEntries([...guardadas].filter(([k]) => NO_CELULAR.has(k))))); } catch { /* sem espaço */ }
+  }, 800);
+}
 const chaveTela = () => (location.hash.replace(/^#\/?$/, "") || "#/hoje");
 export function mostrarGuardada() {
+  if (sessao.user) lerTelasDoCelular();
   const k = chaveTela(), html = guardadas.get(k);
   if (html) { app().innerHTML = html; window.scrollTo(0, 0); mostrandoGuardada = k; return true; }
   app().classList.add("trocando");   // sem tela guardada: escurece a atual enquanto carrega
   return false;
 }
-export function esquecerTelas() { guardadas.clear(); mostrandoGuardada = null; }
+export function esquecerTelas() { guardadas.clear(); mostrandoGuardada = null; telasDoUsuario = null; }
 export function render(html) {
   if (document.getElementById("folha")) fecharFolha();
   const k = chaveTela(), antes = guardadas.get(k);
-  if (ABAS.has(k.split("?")[0])) guardadas.set(k, html);
+  if (ABAS.has(k.split("?")[0])) { guardadas.set(k, html); if (NO_CELULAR.has(k)) salvarTelasNoCelular(); }
   app().classList.remove("trocando");
   if (mostrandoGuardada === k) { mostrandoGuardada = null; if (antes !== html) renderSemRolar(html); return; }
   mostrandoGuardada = null;
