@@ -82,6 +82,7 @@ export async function telaPerfil() {
           <span class="peq mudo" style="text-align:right">${s.treinos} treino${s.treinos > 1 ? "s" : ""} · ${kgBR(s.peso)} · máx ${fmt(s.maior)} kg</span></div>`).join("")}</div></details>` : ""}
     </div>
     <div class="col" style="gap:8px">
+      <a class="item" href="#/historico"><span class="letra">${ico("camera", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Meus treinos</b><span class="mini mudo">Ver, colocar foto e publicar treinos anteriores</span></span><span class="mudo">${ico("seta", 18)}</span></a>
       <a class="item" href="#/conquistas"><span class="letra">🏆</span><span class="col" style="flex:1;gap:2px"><b>Calendário e conquistas</b><span class="mini mudo">Seus dias de treino e medalhas</span></span><span class="mudo">${ico("seta", 18)}</span></a>
       <a class="item" href="#/lembrete"><span class="letra">${ico("sino", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Lembrete de treino</b><span class="mini mudo">Aviso no celular nos seus dias de treino</span></span><span class="mudo">${ico("seta", 18)}</span></a>
       <button class="item" data-acao="meuNome"><span class="letra">${ico("lapis", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Trocar meu nome</b><span class="mini mudo">Como você aparece no app</span></span><span class="mudo">${ico("seta", 18)}</span></button>
@@ -102,3 +103,16 @@ acoes.minhaFoto = async () => {
   toast("Foto salva");
   telaPerfil();
 };
+
+// ---------- MEUS TREINOS (histórico: abrir, pôr foto e publicar depois) ----------
+export async function telaHistorico() {
+  const ss = q(await sb.from("sessoes").select("id, ficha_nome, inicio, fim, foto_path, series_feitas(count)").not("fim", "is", null).order("inicio", { ascending: false }).limit(60))
+    .filter((s) => s.series_feitas?.[0]?.count > 0);
+  const dia = (d) => { const s = new Date(d).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }); return s.charAt(0).toUpperCase() + s.slice(1); };
+  render(`<section class="tela">
+    <div class="topo"><a class="ico" href="#/perfil" aria-label="Voltar">${ico("voltar")}</a><div class="tit"><h2>Meus treinos</h2><span class="mini mudo">Toque para ver, pôr foto ou publicar</span></div></div>
+    <div class="col" style="gap:8px">${ss.map((s) => `<a class="item" href="#/fim/${s.id}"><span class="letra">${h(((s.ficha_nome || "").match(/Treino\s+(\S+)/) || [])[1] || "•")}</span>
+      <span class="col" style="flex:1;gap:2px;min-width:0"><b>${h(s.ficha_nome || "Treino")}</b><span class="mini mudo">${dia(s.inicio)} · ${s.series_feitas[0].count} séries${s.foto_path ? " · 📷" : ""}</span></span>
+      <span class="mudo">${ico("seta", 18)}</span></a>`).join("") || `<div class="vazio">Nenhum treino finalizado ainda.</div>`}</div>
+  </section>${nav("#/perfil")}`);
+}

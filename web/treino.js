@@ -2,9 +2,9 @@
 import {
   sb, acoes, mudancas, limpeza, render, renderSemRolar, ir, h, toast, q, num, fmt, kg, hora, mmss, duracao,
   metaReps, ico, botaoVoltar, treinoAtivo, salvarTreinoAtivo, fotoUrl, fotoUrls, reduzir, enviarFoto, escolherFoto,
-  carregarImagem, grupoDe, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha, grafico,
+  carregarImagem, grupoDe, corpoSvg, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha, grafico,
 } from "./util.js";
-import { exImg, carregarMidia, preencherMidia } from "./midia.js";
+import { exImg, carregarMidia, preencherMidia, musculosDe } from "./midia.js";
 import { idNovo, enfileirar, enviar, pendentes, aoMudarFila } from "./fila.js";
 
 let D = null; // dados do treino carregados
@@ -168,10 +168,6 @@ function desenharTreino(rolar = false) {
       <input id="rp-${i}" type="number" inputmode="numeric" aria-label="Repetições série ${i}" value="${f ? f.reps ?? "" : (ant?.reps ?? meta?.max ?? "")}" ${f ? "disabled" : ""}>
       <button class="ok" data-acao="feitoSerie" data-n="${i}" aria-label="${f ? "Desfazer série " + i : "Concluir série " + i}">${ico("check", 18, 'stroke-width="3"')}</button></div>`);
   }
-  const descansos = feitas.filter((x) => x.descanso_seg).map((x) => {
-    const extra = x.descanso_seg - ex.descanso_seg;
-    return extra > 15 ? `<span class="lar">${mmss(x.descanso_seg)} (+${mmss(extra)})</span>` : mmss(x.descanso_seg);
-  });
 
   const avisos = D.avisos.filter((a) => a.exId === ex.id).map((a) => a.tipo === "acima" ? `
     <div class="cartao ac-borda" role="status"><div class="linha" style="align-items:flex-start">
@@ -220,12 +216,16 @@ function desenharTreino(rolar = false) {
       <div class="col" style="gap:4px;min-width:0"><h2>${h(ex.nome)}</h2>
         <span class="peq mudo">${ex.series} séries · ${h(ex.reps)} repetições${ex.carga_prevista ? " · ficha " + kg(ex.carga_prevista) : ""} · descanso ${mmss(ex.descanso_seg)}</span>
         ${ex.obs ? `<span class="peq ac">${h(ex.obs)}</span>` : ""}</div>
+      ${(() => { const ms = musculosDe(ex.nome); if (!ms.length) return "";
+        const pct = Object.fromEntries(ms.map((m) => [m.grupo, 1]));
+        return `<div class="musc-ex">${corpoSvg(pct)}<div class="col" style="gap:6px"><span class="rot">Músculo trabalhado</span>
+          <div class="linha" style="gap:6px;flex-wrap:wrap">${[...new Set(ms.map((m) => m.nome))].map((m) => `<span class="chip ac">${h(m)}</span>`).join("")}</div></div></div>`; })()}
       <div class="grade2">
         <a href="#/equip/${ex.id}" class="btn peq">${ico("imagem", 16)} ${eq?.nome ? h(eq.nome.slice(0, 16)) : "Equipamento"}${qtdOpc > 1 ? ` · ${opcao}/${qtdOpc}` : ""}</a>
         <button class="btn peq" data-acao="comoFazer" data-nome="${h(ex.nome)}">${ico("play", 15)} Como fazer</button></div>
       <div class="series"><div class="serie cab"><span>Série</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${linhas.join("")}</div>
       <div class="entre"><button class="btn peq" data-acao="maisSerie">${ico("mais", 16)} Série extra</button>
-        ${descansos.length ? `<span class="mini mudo" style="text-align:right">Descansos: ${descansos.join(" · ")}</span>` : ""}</div>
+        ${feitas.length ? `<span class="mini ok-txt">${feitas.length} de ${ex.series} séries feitas</span>` : ""}</div>
     </div>
     ${descanso}
     ${historico}
@@ -385,8 +385,11 @@ acoes.finalizar = async () => {
     enfileirar({ tipo: "del", tab: "sessoes", id: t.sessaoId });
     salvarTreinoAtivo(null); D = null; return ir("#/hoje");
   }
-  const previstas = D.exs.reduce((s, e) => s + e.series, 0);
-  if (D.feitas.length < previstas && !confirm(`Você fez ${D.feitas.length} de ${previstas} séries. Finalizar mesmo assim?`)) return;
+  const faltam = D.exs.map((e) => ({ e, n: D.feitas.filter((x) => x.exercicio_id === e.id).length })).filter((x) => x.n < x.e.series);
+  if (faltam.length) {
+    const lista = faltam.slice(0, 8).map((x) => `• ${x.e.nome} (${x.n} de ${x.e.series} séries)`).join("\n") + (faltam.length > 8 ? `\n… e mais ${faltam.length - 8}` : "");
+    if (!confirm(`Falta${faltam.length > 1 ? "m" : ""} ${faltam.length} exercício${faltam.length > 1 ? "s" : ""}:\n\n${lista}\n\nTem certeza que deseja concluir mesmo assim?`)) return;
+  }
   enfileirar({ tipo: "upd", tab: "sessoes", id: t.sessaoId, dados: { fim: new Date().toISOString() } });
   salvarTreinoAtivo(null); D = null;
   if (await enviar()) {
@@ -504,7 +507,7 @@ export async function telaFim(id) {
   // comemoração só na primeira vez que esta tela abre para este treino
   let jaFesta = false;
   try { jaFesta = !!sessionStorage.getItem("festa-" + s.id); sessionStorage.setItem("festa-" + s.id, "1"); } catch { /* */ }
-  if (!jaFesta) {
+  if (!jaFesta && s.fim && Date.now() - new Date(s.fim) < 30 * 60000) {   // só logo depois de terminar (não ao abrir pelo histórico)
     if (recordes.length) comemorar(recordes.length === 1 ? "Novo recorde!" : `${recordes.length} recordes!`, recordes.map((r) => `${r.nome} ${kg(r.carga)}`).join(" · "));
     import("./conquistas.js").then((m) => m.checarConquistas(recordes.length ? 3800 : 0)).catch(() => {});
   }

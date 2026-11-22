@@ -10,7 +10,7 @@ import { telaEvolucao, telaAvaliacao, telaMedirCasa, telaSemana } from "./evoluc
 import { telaClientes, telaCliente, telaNovoCliente } from "./admin.js";
 import { telaConquistas, telaPublicarSemana } from "./conquistas.js";
 import { exImg, seloMusculo, musculosDe, carregarMidia, preencherMidia } from "./midia.js";
-import { telaPerfil, avatarHtml } from "./perfil.js";
+import { telaPerfil, avatarHtml, telaHistorico } from "./perfil.js";
 import { telaBoasVindas } from "./boasvindas.js";
 import { telaLembrete, desligarLembreteDoAparelho } from "./lembrete.js";
 
@@ -23,6 +23,9 @@ document.addEventListener("click", (e) => {
   const f = acoes[el.dataset.acao];
   if (f) { e.preventDefault(); Promise.resolve(f(el, e)).catch((x) => erro(x)); }
 });
+// teclado aberto (campo de número/texto em foco): some com a barra fixa de baixo
+document.addEventListener("focusin", (e) => { if (e.target.matches?.("input:not([type=checkbox]):not([type=radio]), textarea, select")) document.body.classList.add("digitando"); });
+document.addEventListener("focusout", () => setTimeout(() => { if (!document.activeElement?.matches?.("input, textarea, select")) document.body.classList.remove("digitando"); }, 50));
 document.addEventListener("change", (e) => {
   const el = e.target.closest("[data-muda]");
   if (!el) return;
@@ -75,6 +78,7 @@ async function rota() {
       case "medir": return await telaMedirCasa();
       case "semana": return await telaSemana();
       case "conquistas": return await telaConquistas();
+      case "historico": return await telaHistorico();
       case "perfil": return await telaPerfil();
       case "lembrete": return await telaLembrete();
       case "publicar-semana": return await telaPublicarSemana();
