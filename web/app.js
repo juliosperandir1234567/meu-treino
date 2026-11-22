@@ -112,6 +112,8 @@ sb.auth.onAuthStateChange((_ev, s) => {
   sessao.user = s?.user || null;
   if (antes !== sessao.user?.id) { sessao.perfil = null; esquecerTelas(); rota(); }
 });
+// ao abrir o app (sem tela escolhida no link) começa no Perfil
+if (["", "#", "#/"].includes(location.hash)) history.replaceState(null, "", "#/perfil");
 (async () => {
   if (configOk) { const { data } = await sb.auth.getSession(); sessao.user = data.session?.user || null; }
   rota();
