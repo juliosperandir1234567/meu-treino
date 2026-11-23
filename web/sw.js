@@ -1,5 +1,5 @@
 // Service worker simples: guarda os arquivos do app para abrir rápido.
-const CACHE = "meu-treino-v44";
+const CACHE = "meu-treino-v45";
 const ARQUIVOS = ["./", "index.html", "style.css", "app.js", "util.js", "treino.js", "print.js", "evolucao.js", "admin.js", "conquistas.js", "midia.js", "perfil.js", "fila.js", "lembrete.js", "texto.js", "boasvindas.js", "termos.html", "config.js", "manifest.json", "icon.svg"];
 
 self.addEventListener("install", (e) => {
@@ -26,7 +26,7 @@ self.addEventListener("fetch", (e) => {
   // biblioteca do Supabase (esm.sh): rede primeiro, guardada para abrir sem internet
   if (url.hostname !== location.hostname && url.hostname !== "esm.sh") return;
   e.respondWith(
-    fetch(e.request).then((r) => {
+    fetch(e.request, url.hostname === location.hostname ? { cache: "no-store" } : undefined).then((r) => {
       const copia = r.clone();
       caches.open(CACHE).then((c) => c.put(e.request, copia));
       return r;

@@ -152,7 +152,18 @@ acoes.treinoFinalizar = () => {
   try { sessionStorage.setItem("finalizar-ao-abrir", "1"); } catch { /* */ }
   if (location.hash === "#/treino") { sessionStorage.removeItem("finalizar-ao-abrir"); acoes.finalizar(); } else ir("#/treino");
 };
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+// versão nova publicada: o celular procura ao abrir/voltar ao app e recarrega sozinho quando ela assume
+if ("serviceWorker" in navigator) {
+  const tinhaControle = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((reg) => {
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); });
+  }).catch(() => {});
+  let recarregou = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!tinhaControle || recarregou || location.hash.startsWith("#/treino") && document.activeElement?.matches?.("input")) return;
+    recarregou = true; location.reload();
+  });
+}
 
 // ---------- configuração e login ----------
 function telaConfig() {
