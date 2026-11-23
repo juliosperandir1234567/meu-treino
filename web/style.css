@@ -364,3 +364,44 @@ a, button, input, select, label, summary, [data-acao] { touch-action: manipulati
 .musc-ex svg.corpo { width: 118px; height: auto; flex: 0 0 auto; }
 /* teclado aberto no iPhone: esconde os botões fixos de baixo (eles subiam para o meio da tela) */
 body.digitando .rodape, body.digitando nav.nav { display: none; }
+
+/* ===== tela do treino em lista ===== */
+.treino-lista { padding-top: 0; gap: 10px; padding-bottom: calc(var(--base) + 120px); }
+.treino-topo { position: sticky; top: 0; z-index: 5; margin: 0 -18px; padding: calc(var(--topo) + 10px) 18px 10px; background: var(--s1); border-bottom: 1px solid var(--borda); display: flex; flex-direction: column; gap: 10px; }
+.tt-l1 { display: flex; align-items: center; gap: 10px; }
+.tt-nome { flex: 1; min-width: 0; font-family: "Space Grotesk", sans-serif; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-fim { min-height: 40px; padding: 0 16px; border-radius: 12px; flex: none; }
+.tt-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.tt-stats div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tt-stats span { font-size: 11px; color: var(--mudo); }
+.tt-stats strong { font-size: 15px; white-space: nowrap; }
+.tt-barra { height: 4px; } .tt-barra > div { background: #16A34A; }
+.ex-bloco { background: var(--s1); border: 1px solid var(--borda); border-radius: 18px; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 8px; scroll-margin-top: 150px; }
+.ex-bloco.completo { border-color: rgba(22,163,74,.35); }
+.ex-cab { display: flex; align-items: center; gap: 10px; }
+.ex-foto { width: 46px; height: 46px; border-radius: 50%; overflow: hidden; flex: none; padding: 0; border: 1px solid var(--borda); background: var(--s2); }
+.ex-foto .ex-img { border-radius: 50%; width: 100%; height: 100%; }
+.ex-tit { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; background: none; border: 0; padding: 0; text-align: left; color: inherit; }
+.ex-tit b { color: var(--ac); font-size: 16px; line-height: 1.25; }
+.ex-tit span { font-size: 12px; color: var(--mudo); }
+.ex-ok { width: 26px; height: 26px; border-radius: 50%; background: #16A34A; color: #fff; display: grid; place-items: center; flex: none; }
+.ex-mais { width: 36px; height: 36px; border: 0; background: none; color: var(--fraco); font-size: 20px; }
+.ex-desc { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ac); }
+.treino-lista .serie { grid-template-columns: 34px 1fr 70px 60px 44px; min-height: 48px; padding: 4px; }
+.treino-lista .serie .num-s { text-align: center; color: var(--mudo); }
+.treino-lista .serie .ant { font-size: 13px; color: var(--fraco); text-align: center; }
+.treino-lista .serie.cab span { text-align: center; }
+.add-serie { min-height: 40px; background: var(--s2); border: 0; }
+.aviso-ex { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-radius: 12px; padding: 8px 10px; font-size: 13px; }
+.aviso-ex.ac { background: rgba(37,99,235,.08); } .aviso-ex.lar { background: rgba(217,119,6,.10); }
+.faixa-desc { position: fixed; left: 10px; right: 10px; bottom: calc(var(--base) + 12px); max-width: 500px; margin: 0 auto; z-index: 7; background: var(--txt); color: #fff; border-radius: 18px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 30px rgba(15,23,42,.3); }
+.faixa-desc .cron { font-family: "Space Grotesk", sans-serif; font-size: 24px; font-weight: 700; min-width: 64px; color: #fff; }
+.faixa-desc.pronto .cron { color: #4ADE80; }
+.fd-info { flex: 1; min-width: 0; font-size: 11px; color: #CBD5E1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fd-info i { display: block; height: 4px; border-radius: 4px; background: #334155; margin-top: 6px; overflow: hidden; }
+.fd-info i b { display: block; height: 100%; background: #60A5FA; transition: width 1s linear; }
+.fd-bt { flex: none; background: #1E293B; color: #fff; border: 0; border-radius: 10px; padding: 8px; font-size: 13px; font-weight: 600; }
+.fd-bt.az { background: var(--ac); }
+.ex-img-folha { border-radius: 16px; overflow: hidden; max-height: 260px; }
+.ex-img-folha img { width: 100%; display: block; }
+body.digitando .faixa-desc { display: none; }

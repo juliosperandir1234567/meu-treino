@@ -103,7 +103,9 @@ export async function telaTreino() {
   if (!D || D.sessaoId !== t.sessaoId) await carregar(t);
   if (!D.exs.length) { toast("Essa ficha não tem exercícios"); return ir(`#/ficha/${t.fichaId}`); }
   manterTelaLigada(true);
-  desenharTreino();
+  desenharTreino(true);
+  const prox = D.exs.findIndex((e) => D.feitas.filter((x) => x.exercicio_id === e.id).length < e.series);
+  if (D.feitas.length && prox > 0) setTimeout(() => document.getElementById(`ex-${prox}`)?.scrollIntoView({ block: "start" }), 30);
   let pedirFim = false; try { pedirFim = !!sessionStorage.getItem("finalizar-ao-abrir"); sessionStorage.removeItem("finalizar-ao-abrir"); } catch { /* */ }
   if (pedirFim) setTimeout(() => acoes.finalizar(), 50);
   let avisou10 = false, avisou0 = false, ultimoAte = null;
@@ -136,108 +138,127 @@ function mostrarFila(n = pendentes()) {
   el.textContent = `Sem internet · ${n} ${n === 1 ? "registro guardado" : "registros guardados"} no celular`;
 }
 
-function desenharTreino(rolar = false) {
-  const t = treinoAtivo();
-  const n = D.exs.length;
-  t.idx = Math.min(Math.max(0, t.idx || 0), n - 1);
-  const ex = D.exs[t.idx];
+// Tela do treino: todos os exercícios numa lista só (rola para baixo), séries em tabela,
+// descanso numa faixa embaixo e Finalizar sempre no alto.
+const rasc = {};   // o que a pessoa digitou e ainda não marcou (não se perde ao redesenhar)
+mudancas.rascunho = (el) => { rasc[el.dataset.k] = el.value; };
+function recordesHoje() {
+  let n = 0;
+  for (const e of D.exs) {
+    const antes = Math.max(0, ...D.hist.filter((x) => x.exercicio_id === e.id).map((x) => Number(x.carga) || 0));
+    const hoje = Math.max(0, ...D.feitas.filter((x) => x.exercicio_id === e.id).map((x) => Number(x.carga) || 0));
+    if (antes && hoje > antes) n++;
+  }
+  return n;
+}
+function cartaoExercicio(ex, i, t) {
   const opcao = t.opcoes[ex.id] || 1;
-  const eq = D.eqs.find((e) => e.exercicio_id === ex.id && e.opcao === opcao);
-  const qtdOpc = D.eqs.filter((e) => e.exercicio_id === ex.id).length;
-  const fotoEq = eq?.foto_path ? D.urls?.[eq.foto_path] : null;
   const feitas = D.feitas.filter((x) => x.exercicio_id === ex.id);
   const uv = ultimaVez(ex.id, opcao);
   const meta = metaReps(ex.reps);
   const ultimaHoje = feitas[feitas.length - 1];
-  // carga sugerida: a última usada neste aparelho; se a ficha subiu a carga (opção 1), vale a da ficha
   let base = uv.carga ?? ex.carga_prevista;
   if (opcao === 1 && ex.carga_prevista != null && uv.carga != null && Number(ex.carga_prevista) > Number(uv.carga)) base = ex.carga_prevista;
   const cargaPadrao = ultimaHoje?.carga ?? base ?? "";
-  const totalSeries = Math.max(ex.series, feitas.length);
-  const exsFeitos = new Set(D.feitas.map((x) => x.exercicio_id));
-  const pct = Math.round((D.exs.filter((e) => exsFeitos.has(e.id)).length / n) * 100);
-
+  const total = Math.max(ex.series, feitas.length);
+  const completo = feitas.length >= ex.series;
   const linhas = [];
-  for (let i = 1; i <= totalSeries; i++) {
-    const f = feitas.find((x) => x.numero === i);
-    const ant = uv.porNum[i];
+  for (let n = 1; n <= total; n++) {
+    const f = feitas.find((x) => x.numero === n);
+    const ant = uv.porNum[n];
+    const kk = `${ex.id}-${n}`;
+    const vKg = f ? f.carga ?? "" : rasc[kk + "-kg"] ?? cargaPadrao;
+    const vRp = f ? f.reps ?? "" : rasc[kk + "-rp"] ?? (ant?.reps ?? meta?.max ?? "");
     linhas.push(`<div class="serie ${f ? "feita" : ""}">
-      <b style="text-align:center">${i}</b>
-      <span class="peq mudo">${ant ? `${fmt(ant.carga)} × ${ant.reps ?? "—"}` : "—"}</span>
-      <input id="kg-${i}" type="number" inputmode="decimal" step="0.5" aria-label="Carga série ${i}" value="${f ? f.carga ?? "" : cargaPadrao}" ${f ? "disabled" : ""}>
-      <input id="rp-${i}" type="number" inputmode="numeric" aria-label="Repetições série ${i}" value="${f ? f.reps ?? "" : (ant?.reps ?? meta?.max ?? "")}" ${f ? "disabled" : ""}>
-      <button class="ok" data-acao="feitoSerie" data-n="${i}" aria-label="${f ? "Desfazer série " + i : "Concluir série " + i}">${ico("check", 18, 'stroke-width="3"')}</button></div>`);
+      <b class="num-s">${n}</b>
+      <span class="ant">${ant ? `${fmt(ant.carga)} × ${ant.reps ?? "—"}` : "—"}</span>
+      <input id="kg-${i}-${n}" type="number" inputmode="decimal" step="0.5" aria-label="Carga série ${n}" value="${h(vKg)}" ${f ? "disabled" : `data-muda="rascunho" data-k="${kk}-kg"`}>
+      <input id="rp-${i}-${n}" type="number" inputmode="numeric" aria-label="Repetições série ${n}" value="${h(vRp)}" ${f ? "disabled" : `data-muda="rascunho" data-k="${kk}-rp"`}>
+      <button class="ok" data-acao="feitoSerie" data-ex="${i}" data-n="${n}" aria-label="${f ? "Desfazer série " + n : "Concluir série " + n}">${ico("check", 18, 'stroke-width="3"')}</button></div>`);
   }
-
   const avisos = D.avisos.filter((a) => a.exId === ex.id).map((a) => a.tipo === "acima" ? `
-    <div class="cartao ac-borda" role="status"><div class="linha" style="align-items:flex-start">
-      <span class="ico" style="width:32px;height:32px;border:0;background:rgba(37,99,235,.12);color:var(--ac)">${ico("cima", 18)}</span>
-      <div class="col" style="gap:2px"><b>Você aumentou a carga</b><span class="peq mudo">${kg(a.carga)} na série ${a.n}. ${a.refTxt}. Usar ${kg(a.carga)} daqui pra frente?</span></div></div>
-      <div class="grade2"><button class="btn pri peq" data-acao="novaCarga" data-carga="${a.carga}">Sim, nova carga</button><button class="btn peq" data-acao="fecharAviso" data-id="${a.id}">Só hoje</button></div></div>` : `
-    <div class="cartao lar-borda" role="status"><div class="linha" style="align-items:flex-start">
-      <span class="ico" style="width:32px;height:32px;border:0;background:rgba(217,119,6,.12);color:var(--lar)">${ico(a.tipo === "menosCarga" ? "baixo" : "baixo", 18)}</span>
-      <div class="col" style="gap:2px"><b>Abaixo do previsto</b><span class="peq mudo">${a.txt}</span></div>
-      <button class="ico" style="width:32px;height:32px;margin-left:auto" data-acao="fecharAviso" data-id="${a.id}" aria-label="Fechar aviso">✕</button></div></div>`).join("");
+    <div class="aviso-ex ac"><span>Subiu para <b>${kg(a.carga)}</b>. ${h(a.refTxt)}. Usar daqui pra frente?</span>
+      <div class="linha" style="gap:6px"><button class="btn peq pri" data-acao="novaCarga" data-ex="${i}" data-carga="${a.carga}">Sim</button><button class="btn peq" data-acao="fecharAviso" data-id="${a.id}">Só hoje</button></div></div>` : `
+    <div class="aviso-ex lar"><span>${h(a.txt)}</span><button class="ico" style="width:30px;height:30px" data-acao="fecharAviso" data-id="${a.id}" aria-label="Fechar aviso">✕</button></div>`).join("");
+  const musc = [...new Set(musculosDe(ex.nome).map((m) => m.nome))].slice(0, 3).join(" · ");
+  return `<div class="ex-bloco ${completo ? "completo" : ""}" id="ex-${i}">
+    <div class="ex-cab">
+      <button class="ex-foto" data-acao="exMais" data-ex="${i}" aria-label="Detalhes de ${h(ex.nome)}">${exImg(ex.nome)}</button>
+      <button class="ex-tit" data-acao="exMais" data-ex="${i}"><b>${h(ex.nome)}</b><span>${musc || `${ex.series} × ${h(ex.reps)}`}</span></button>
+      ${completo ? `<span class="ex-ok">${ico("check", 16, 'stroke-width="3"')}</span>` : ""}
+      <button class="ico ex-mais" data-acao="exMais" data-ex="${i}" aria-label="Mais opções">⋯</button>
+    </div>
+    ${ex.obs ? `<span class="peq ac">${h(ex.obs)}</span>` : ""}
+    <span class="ex-desc">${ico("relogio", 14)} Descanso: ${mmss(ex.descanso_seg)} · ${ex.series} × ${h(ex.reps)}${ex.carga_prevista ? " · ficha " + kg(ex.carga_prevista) : ""}</span>
+    ${avisos}
+    <div class="series"><div class="serie cab"><span>Série</span><span>Anterior</span><span>Kg</span><span>Reps</span><span>✓</span></div>${linhas.join("")}</div>
+    <button class="btn peq blk add-serie" data-acao="maisSerie" data-ex="${i}">${ico("mais", 16)} Adicionar série</button>
+  </div>`;
+}
+function desenharTreino(rolar = false) {
+  const t = treinoAtivo();
+  const n = D.exs.length;
+  const exsFeitos = D.exs.filter((e) => D.feitas.filter((x) => x.exercicio_id === e.id).length >= e.series).length;
+  const previstas = D.exs.reduce((s, e) => s + e.series, 0);
+  const pct = Math.round((Math.min(D.feitas.length, previstas) / (previstas || 1)) * 100);
+  const rec = recordesHoje();
 
   let resta = t.descansoAte ? (new Date(t.descansoAte) - Date.now()) / 1000 : null;
   if (resta !== null && resta < -120) { t.descansoAte = null; salvarTreinoAtivo(t); resta = null; }
   const fim = resta !== null && resta <= 0;
+  const exDesc = t.descansoEx ? D.exs.find((e) => e.id === t.descansoEx) : null;
   const descanso = t.descansoAte ? `
-    <div id="cardDescanso" class="cartao ${fim ? "pronto ac-borda" : ""}">
-      <div class="entre"><div class="col" style="gap:2px"><span id="rotDescanso" class="mini mudo">${fim ? "Descanso acabou · hora da próxima série" : "Descanso"}</span>
-        <span id="cron" class="cron">${fim ? "Bora!" : mmss(resta)}</span></div>
-        <div class="linha" style="gap:6px"><button class="btn peq" data-acao="ajusteDescanso" data-s="-15">−15s</button><button class="btn peq" data-acao="ajusteDescanso" data-s="15">+15s</button><button class="btn peq pri" data-acao="pularDescanso">Continuar treino</button></div></div>
-      <div class="barra"><div id="barDescanso" style="width:${fim ? 0 : Math.max(0, (resta / (t.descansoTotal || 90)) * 100)}%"></div></div></div>` : "";
+    <div id="cardDescanso" class="faixa-desc ${fim ? "pronto" : ""}">
+      <span id="cron" class="cron">${fim ? "Bora!" : mmss(resta)}</span>
+      <span class="fd-info"><span id="rotDescanso">${fim ? "Descanso acabou · hora da próxima série" : "Descanso"}</span>${exDesc ? ` · ${h(exDesc.nome)}` : ""}
+        <i><b id="barDescanso" style="width:${fim ? 0 : Math.max(0, (resta / (t.descansoTotal || 90)) * 100)}%"></b></i></span>
+      <button class="fd-bt" data-acao="ajusteDescanso" data-s="-15">−15</button><button class="fd-bt" data-acao="ajusteDescanso" data-s="15">+15</button>
+      <button class="fd-bt az" data-acao="pularDescanso">Continuar</button></div>` : "";
 
+  const html = `<section class="tela treino-lista">
+    <div class="treino-topo">
+      <div class="tt-l1">${botaoVoltar("#/hoje")}<b class="tt-nome">${h(t.fichaNome)}</b><button class="btn pri tt-fim" data-acao="finalizar">Finalizar</button></div>
+      <div class="tt-stats">
+        <div><span>Duração</span><strong id="decorrido" class="ac">${mmss((Date.now() - new Date(D.s.inicio)) / 1000)}</strong></div>
+        <div><span>Séries</span><strong>${D.feitas.length} de ${previstas}</strong></div>
+        <div><span>Exercícios</span><strong>${exsFeitos} de ${n}</strong></div>
+        <div><span>Recordes</span><strong>${rec ? "🏆 " + rec : "—"}</strong></div>
+      </div>
+      <div class="barra tt-barra"><div style="width:${pct}%"></div></div>
+      <span id="filaInfo" class="fila-info" ${pendentes() ? "" : "hidden"}>Sem internet · ${pendentes()} registros guardados no celular</span>
+    </div>
+    ${D.exs.map((ex, i) => cartaoExercicio(ex, i, t)).join("")}
+    <button class="btn perigo peq blk" data-acao="cancelarTreino" style="margin-top:8px">${ico("lixo", 16)} Cancelar treino</button>
+  </section>
+  ${descanso}`;
+  rolar ? render(html) : renderSemRolar(html);
+  preencherMidia();
+}
+// "⋯" do exercício: como fazer, aparelho, músculo e histórico de carga
+acoes.exMais = (el) => {
+  const t = treinoAtivo(); const i = Number(el.dataset.ex); const ex = D.exs[i];
+  const opcao = t.opcoes[ex.id] || 1;
+  const eq = D.eqs.find((e) => e.exercicio_id === ex.id && e.opcao === opcao);
+  const fotoEq = eq?.foto_path ? D.urls?.[eq.foto_path] : null;
+  const ms = musculosDe(ex.nome);
   const porSessao = new Map();
   [...D.hist.filter((x) => x.exercicio_id === ex.id)].reverse().forEach((x) => {
     const c = Number(x.carga) || 0, v = porSessao.get(x.sessao_id);
     if (!v) porSessao.set(x.sessao_id, { c, d: x.feita_em }); else if (c > v.c) v.c = c;
   });
-  const histPts = [...porSessao.values()].slice(-9);
-  const maxHoje = Math.max(0, ...feitas.map((x) => Number(x.carga) || 0));
-  if (maxHoje) histPts.push({ c: maxHoje, d: new Date().toISOString() });
-  const historico = histPts.length >= 2 ? `<div class="cartao"><div class="entre"><b>Histórico de carga</b><span class="mini mudo">maior carga por treino</span></div>
-    ${grafico(histPts.map((x) => x.c), histPts.map((x) => new Date(x.d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })))}
-    <div class="entre mini mudo"><span>Primeira: <b style="color:var(--txt)">${kg(histPts[0].c)}</b></span><span>Melhor: <b class="ac">${kg(Math.max(...histPts.map((x) => x.c)))}</b></span></div></div>` : "";
-  const html = `<section class="tela">
-    <div class="topo">${botaoVoltar("#/hoje")}<div class="tit" style="align-items:center"><b class="num" style="font-size:17px">${h(t.fichaNome)}</b>
-      <span class="peq mudo">Início ${hora(D.s.inicio)} · <span id="decorrido">${mmss((Date.now() - new Date(D.s.inicio)) / 1000)}</span> de treino</span></div><button class="ico" data-acao="cancelarTreino" aria-label="Cancelar treino" title="Cancelar treino">✕</button></div>
-    <div class="col" style="gap:6px"><div class="entre mini mudo"><span>Exercício ${t.idx + 1} de ${n} · ${pct}% feito</span>
-      <button class="btn peq" style="min-height:32px" data-acao="listaExs">${ico("lista", 15)} Ver todos</button></div><div class="barra"><div style="width:${pct}%"></div></div>
-      <span id="filaInfo" class="fila-info" ${pendentes() ? "" : "hidden"}>Sem internet · ${pendentes()} registros guardados no celular</span></div>
-    <div class="exs">${D.exs.map((e, i) => `<button data-acao="irEx" data-i="${i}" class="${i === t.idx ? "at" : exsFeitos.has(e.id) ? "fe" : ""}" aria-label="${h(e.nome)}">${i + 1}</button>`).join("")}</div>
-    ${avisos}
-    <div class="cartao">
-      <div class="ex-midia">
-        ${verAparelho && fotoEq ? `<button class="ex-foto-ap" data-acao="verFoto" data-src="${h(fotoEq)}" data-tit="${h(eq?.nome || ex.nome)}" aria-label="Ampliar foto do aparelho"><img src="${h(fotoEq)}" alt="Foto do aparelho"></button>` : exImg(ex.nome, "grande")}
-        ${fotoEq ? `<div class="ex-midia-abas"><button class="${verAparelho ? "" : "at"}" data-acao="midiaAba" data-v="0">Movimento</button><button class="${verAparelho ? "at" : ""}" data-acao="midiaAba" data-v="1">Meu aparelho</button></div>` : ""}
-      </div>
-      <div class="col" style="gap:4px;min-width:0"><h2>${h(ex.nome)}</h2>
-        <span class="peq mudo">${ex.series} séries · ${h(ex.reps)} repetições${ex.carga_prevista ? " · ficha " + kg(ex.carga_prevista) : ""} · descanso ${mmss(ex.descanso_seg)}</span>
-        ${ex.obs ? `<span class="peq ac">${h(ex.obs)}</span>` : ""}</div>
-      ${(() => { const ms = musculosDe(ex.nome); if (!ms.length) return "";
-        const pct = Object.fromEntries(ms.map((m) => [m.grupo, 1]));
-        return `<div class="musc-ex">${corpoSvg(pct)}<div class="col" style="gap:6px"><span class="rot">Músculo trabalhado</span>
-          <div class="linha" style="gap:6px;flex-wrap:wrap">${[...new Set(ms.map((m) => m.nome))].map((m) => `<span class="chip ac">${h(m)}</span>`).join("")}</div></div></div>`; })()}
-      <div class="grade2">
-        <a href="#/equip/${ex.id}" class="btn peq">${ico("imagem", 16)} ${eq?.nome ? h(eq.nome.slice(0, 16)) : "Equipamento"}${qtdOpc > 1 ? ` · ${opcao}/${qtdOpc}` : ""}</a>
-        <button class="btn peq" data-acao="comoFazer" data-nome="${h(ex.nome)}">${ico("play", 15)} Como fazer</button></div>
-      <div class="series"><div class="serie cab"><span>Série</span><span>Anterior</span><span>Kg</span><span>Reps</span><span></span></div>${linhas.join("")}</div>
-      <div class="entre"><button class="btn peq" data-acao="maisSerie">${ico("mais", 16)} Série extra</button>
-        ${feitas.length ? `<span class="mini ok-txt">${feitas.length} de ${ex.series} séries feitas</span>` : ""}</div>
-    </div>
-    ${descanso}
-    ${historico}
-    ${t.idx + 1 < n ? `<div class="col" style="gap:8px"><span class="rot">A seguir</span><button class="cartao tracejado" style="text-align:left;color:inherit" data-acao="irEx" data-i="${t.idx + 1}">
-      <div class="entre"><div class="col" style="gap:2px"><b>${h(D.exs[t.idx + 1].nome)}</b><span class="mini mudo">${D.exs[t.idx + 1].series} × ${h(D.exs[t.idx + 1].reps)}</span></div><span class="peq mudo">${t.idx + 2}/${n}</span></div></button></div>` : ""}
-  </section>
-  <div class="rodape"><div style="display:grid;grid-template-columns:1fr 2fr">
-    <button class="btn" data-acao="finalizar">Finalizar</button>
-    ${t.idx + 1 < n ? `<button class="btn pri" data-acao="irEx" data-i="${t.idx + 1}">Próximo exercício</button>` : `<button class="btn pri" data-acao="finalizar">Concluir treino</button>`}
-  </div></div>`;
-  rolar ? render(html) : renderSemRolar(html);
-}
+  const pts = [...porSessao.values()].slice(-9);
+  const maxHoje = Math.max(0, ...D.feitas.filter((x) => x.exercicio_id === ex.id).map((x) => Number(x.carga) || 0));
+  if (maxHoje) pts.push({ c: maxHoje, d: new Date().toISOString() });
+  abrirFolha(`<div class="entre"><h2>${h(ex.nome)}</h2><button class="ico" data-acao="fecharFolha" aria-label="Fechar">✕</button></div>
+    <div class="ex-img-folha">${fotoEq ? `<img src="${h(fotoEq)}" alt="Foto do aparelho">` : exImg(ex.nome, "grande")}</div>
+    <div class="grade2">
+      <button class="btn" data-acao="comoFazer" data-nome="${h(ex.nome)}">${ico("play", 16)} Como fazer</button>
+      <a class="btn" href="#/equip/${ex.id}">${ico("imagem", 16)} ${eq?.nome ? h(eq.nome.slice(0, 14)) : "Aparelho"}</a></div>
+    ${ms.length ? `<div class="musc-ex">${corpoSvg(Object.fromEntries(ms.map((m) => [m.grupo, 1])))}<div class="col" style="gap:6px"><span class="rot">Músculo trabalhado</span>
+      <div class="linha" style="gap:6px;flex-wrap:wrap">${[...new Set(ms.map((m) => m.nome))].map((m) => `<span class="chip ac">${h(m)}</span>`).join("")}</div></div></div>` : ""}
+    ${pts.length >= 2 ? `<div class="cartao"><div class="entre"><b>Histórico de carga</b><span class="mini mudo">maior carga por treino</span></div>
+      ${grafico(pts.map((x) => x.c), pts.map((x) => new Date(x.d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })))}</div>` : ""}`, ex.nome);
+};
 
 // lista de todos os exercícios para pular para qualquer um
 acoes.listaExs = () => {
@@ -292,15 +313,16 @@ acoes.comoFazer = async (el) => {
 };
 let verAparelho = false;
 acoes.midiaAba = (el) => { verAparelho = el.dataset.v === "1"; desenharTreino(); };
-acoes.irEx = (el) => { const t = treinoAtivo(); t.idx = Number(el.dataset.i); salvarTreinoAtivo(t); desenharTreino(true); };
-acoes.maisSerie = async () => {
-  const t = treinoAtivo(); const ex = D.exs[t.idx];
+acoes.irEx = (el) => { document.getElementById(`ex-${el.dataset.i}`)?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+acoes.maisSerie = async (el) => {
+  const ex = D.exs[Number(el.dataset.ex)];
   ex.series += 1; desenharTreino();
 };
 acoes.feitoSerie = async (el) => {
   destravarAudio();
   const t = treinoAtivo();
-  const ex = D.exs[t.idx];
+  const iEx = Number(el.dataset.ex); t.idx = iEx;
+  const ex = D.exs[iEx];
   const n = Number(el.dataset.n);
   const opcao = t.opcoes[ex.id] || 1;
   const ja = D.feitas.find((x) => x.exercicio_id === ex.id && x.numero === n);
@@ -310,8 +332,8 @@ acoes.feitoSerie = async (el) => {
     t.feitas = D.feitas; salvarTreinoAtivo(t);
     return desenharTreino();
   }
-  const carga = num(document.getElementById(`kg-${n}`).value);
-  const reps = num(document.getElementById(`rp-${n}`).value);
+  const carga = num(document.getElementById(`kg-${iEx}-${n}`).value);
+  const reps = num(document.getElementById(`rp-${iEx}-${n}`).value);
   const agora = new Date();
   const descanso = t.ultimaSerie ? Math.round((agora - new Date(t.ultimaSerie)) / 1000) : null;
   const linha = {
@@ -326,6 +348,7 @@ acoes.feitoSerie = async (el) => {
   if (feitasEx < ex.series || t.idx + 1 < D.exs.length) {
     t.descansoAte = new Date(agora.getTime() + ex.descanso_seg * 1000).toISOString();
     t.descansoTotal = ex.descanso_seg;
+    t.descansoEx = ex.id;
   } else t.descansoAte = null;
   salvarTreinoAtivo(t);
 
@@ -353,10 +376,11 @@ acoes.feitoSerie = async (el) => {
       txt: `Série ${n} com ${reps} repetições (meta ${meta.min === meta.max ? meta.min : meta.min + "–" + meta.max}).` + (seguidas ? " Duas séries seguidas abaixo: vale baixar um pouco a carga." : "") });
   }
   desenharTreino();
+  if (feitasEx === ex.series && iEx + 1 < D.exs.length) setTimeout(() => document.getElementById(`ex-${iEx + 1}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
 };
 acoes.fecharAviso = (el) => { D.avisos = D.avisos.filter((a) => a.id !== el.dataset.id); desenharTreino(); };
 acoes.novaCarga = async (el) => {
-  const t = treinoAtivo(); const ex = D.exs[t.idx]; const carga = num(el.dataset.carga);
+  const ex = D.exs[Number(el.dataset.ex)]; const carga = num(el.dataset.carga);
   enfileirar({ tipo: "upd", tab: "exercicios", id: ex.id, dados: { carga_prevista: carga } });
   ex.carga_prevista = carga;
   D.avisos = D.avisos.filter((a) => !(a.exId === ex.id && a.tipo === "acima"));
