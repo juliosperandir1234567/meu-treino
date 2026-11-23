@@ -736,8 +736,11 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
   }
   // três cartões de números
   const sh = k ? 124 : 146, stop = y - sh, gap = 18, livre = W - 2 * M - 2 * gap;
-  const larg = [0.31, 0.29, 0.40].map((p) => p * livre);
-  const dados = [["cronometro", "Duração", s.fim ? duracao(s.inicio, s.fim) : "—"], recordes.length ? ["trofeu", "Recordes", String(recordes.length)] : ["halter", "Maior carga", (() => { const m = Math.max(0, ...ser.map((x) => Number(x.carga) || 0)); return m ? fmt(m) + " kg" : "—"; })()], ["calendario", "Data", new Date(s.inicio).toLocaleDateString("pt-BR")]];
+  // sem recorde: só Duração e Data (as séries já aparecem na linha de cima)
+  const dados = [["cronometro", "Duração", s.fim ? duracao(s.inicio, s.fim) : "—"],
+    ...(recordes.length ? [["trofeu", "Recordes", String(recordes.length)]] : []),
+    ["calendario", "Data", new Date(s.inicio).toLocaleDateString("pt-BR")]];
+  const larg = (dados.length === 3 ? [0.31, 0.29, 0.40] : [0.42, 0.58]).map((p) => p * (W - 2 * M - (dados.length - 1) * gap));
   let x = M;
   dados.forEach(([ic, rot, v], i) => {
     const w = larg[i];
