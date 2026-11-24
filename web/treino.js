@@ -561,104 +561,194 @@ acoes.apagarSessao = async (el) => {
 };
 
 // ---------- PUBLICAR ----------
+// Modelo de compartilhamento: fundo preto, símbolo do logo no topo, foto grande com borda verde-limão
+// (a pessoa escolhe, arrasta e dá zoom), "TREINO CONCLUÍDO", nome do treino, duração · séries · exercícios e data.
 let formato = "story";
 let ultimaImagem = null;
+const ajuste = {};          // posição/zoom da foto por treino: { z, dx, dy } (dx/dy em fração da área da foto)
+let pub = null;             // o que está na tela: { id, r, img }
+let layoutAtual = null;     // área da foto no último desenho (para arrastar e limitar)
+const LIMA = "#B5FF00", BRANCO = "#FFFFFF", CINZA = "#C9CCC4";
+const ESPORTE = "'Barlow Condensed', 'Arial Narrow', sans-serif", SANS = "Inter, sans-serif";
+let simbolo = null;
+const carregarSimbolo = () => simbolo || (simbolo = carregarImagem("simbolo.png").catch(() => null));
+
 export async function telaPublicar(id) {
+  if (formato !== "story" && formato !== "post") formato = "story";
   const r = await resumoSessao(id);
   const foto = r.s.foto_path ? await fotoUrl(r.s.foto_path) : null;
-  const comFoto = formato !== "numeros";
+  let img = null;
+  if (foto) { try { img = await carregarImagem(foto); } catch { /* foto indisponível */ } }
+  pub = { id, r, img };
+  const aj = ajuste[id] || (ajuste[id] = { z: 1, dx: 0, dy: 0 });
   render(`<section class="tela">
-    <div class="topo">${botaoVoltar(`#/fim/${id}`)}<div class="tit"><h2>Publicar treino</h2></div></div>
-    <canvas id="cv" class="prev${comFoto ? " toque" : ""}" ${comFoto ? `data-acao="fotoPublicar" data-id="${id}" role="button"` : ""} aria-label="Prévia da imagem para publicar${comFoto ? ". Toque para escolher a foto" : ""}"></canvas>
-    <div class="abas">${[["story", "Story"], ["post", "Post"], ["numeros", "Só números"]].map(([k, t]) => `<button class="${formato === k ? "at" : ""}" data-acao="formato" data-f="${k}" data-id="${id}">${t}</button>`).join("")}</div>
-    ${comFoto ? `<button class="btn" data-acao="fotoPublicar" data-id="${id}">${ico("camera", 18)} ${foto ? "Trocar foto" : "Escolher foto do treino"}</button>` : ""}
+    <div class="topo">${botaoVoltar(`#/fim/${id}`)}<div class="tit"><h2>Compartilhar treino</h2></div></div>
+    <div class="abas">${[["story", "Story"], ["post", "Post"]].map(([k, t]) => `<button class="${formato === k ? "at" : ""}" data-acao="formato" data-f="${k}" data-id="${id}">${t}</button>`).join("")}</div>
+    <canvas id="cv" class="prev pub-prev" aria-label="Prévia da imagem. ${img ? "Arraste para posicionar a foto" : "Toque para escolher a foto"}"></canvas>
+    <div class="pub-ctl">
+      <button class="btn" data-acao="fotoPublicar" data-id="${id}">${ico("camera", 18)} ${img ? "Trocar foto" : "Escolher foto"}</button>
+      ${img ? `<label class="pub-zoom"><span>Zoom</span><input id="zoomFoto" type="range" min="1" max="3" step="0.01" value="${aj.z}" aria-label="Zoom da foto"></label>
+        <span class="mini mudo" style="text-align:center">Arraste a foto na prévia para posicionar · <button class="link" data-acao="resetFoto">centralizar</button></span>` : ""}
+    </div>
   </section>
   <div class="rodape"><div><button class="btn" data-acao="salvarImg">Salvar imagem</button><button class="btn pri" data-acao="compartilhar">${ico("share", 18)} Compartilhar</button></div></div>`);
-  await desenharCard(r, foto);
+  try { await document.fonts.load(`italic 800 100px ${ESPORTE}`); await document.fonts.ready; } catch { /* usa a fonte reserva */ }
+  await carregarSimbolo();
+  redesenhar();
+  ligarAjusteFoto();
 }
 acoes.formato = (el) => { formato = el.dataset.f; telaPublicar(el.dataset.id); };
 acoes.fotoPublicar = async (el) => {
   const file = await escolherFoto();
   if (!file) return;
   toast("Enviando foto…");
-  const path = await enviarFoto(await reduzir(file, 1600, 0.85), "treinos");
+  const path = await enviarFoto(await reduzir(file, 1800, 0.88), "treinos");
   q(await sb.from("sessoes").update({ foto_path: path }).eq("id", el.dataset.id));
+  ajuste[el.dataset.id] = { z: 1, dx: 0, dy: 0 };
   toast("Foto salva"); telaPublicar(el.dataset.id);
 };
+acoes.resetFoto = () => { if (!pub) return; ajuste[pub.id] = { z: 1, dx: 0, dy: 0 }; const z = document.getElementById("zoomFoto"); if (z) z.value = 1; redesenhar(); };
 
-// ícones (traço, grade 24×24) desenhados no canvas
-const ICONES = {
-  calendario: ["M8 2v4", "M16 2v4", "M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "M3 10h18"],
-  halter: ["M6.5 6h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z", "M3.5 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z",
-    "M16.5 6h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z", "M19.5 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z",
-    "M8.5 12h7", "M1 12h1.5", "M21.5 12H23"],
-  cronometro: ["M10 2h4", "M12 14l3-3", "M20 14a8 8 0 1 1-16 0a8 8 0 1 1 16 0", "M19 5l1.5 1.5"],
-  relogio: ["M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0", "M12 6.5V12l3.5 2"],
-  trofeu: ["M6 9H4.5a2.5 2.5 0 0 1 0-5H6", "M18 9h1.5a2.5 2.5 0 0 0 0-5H18", "M4 22h16", "M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22", "M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22", "M18 2H6v7a6 6 0 0 0 12 0V2Z"],
-  camera: ["M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z", "M15 13a3 3 0 1 1-6 0a3 3 0 1 1 6 0"],
-};
-function icone(c, nome, x, y, tam, cor, larg = 1.8) {
-  c.save(); c.translate(x, y); c.scale(tam / 24, tam / 24);
-  c.strokeStyle = cor; c.lineWidth = larg; c.lineCap = "round"; c.lineJoin = "round";
-  ICONES[nome].forEach((d) => c.stroke(new Path2D(d)));
-  c.restore();
+// arrastar a foto na prévia e zoom pelo controle (ou pinça com dois dedos)
+function ligarAjusteFoto() {
+  const cv = document.getElementById("cv"); if (!cv || !pub) return;
+  if (!pub.img) { cv.onclick = () => document.querySelector('[data-acao="fotoPublicar"]')?.click(); return; }
+  const aj = ajuste[pub.id];
+  const z = document.getElementById("zoomFoto");
+  if (z) z.oninput = () => { aj.z = Number(z.value); limitar(aj); redesenhar(); };
+  const toques = new Map(); let dist0 = 0, z0 = 1;
+  cv.style.touchAction = "none";
+  cv.onpointerdown = (e) => { cv.setPointerCapture(e.pointerId); toques.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (toques.size === 2) { const [a, b] = [...toques.values()]; dist0 = Math.hypot(a.x - b.x, a.y - b.y); z0 = aj.z; } };
+  cv.onpointermove = (e) => {
+    const ant = toques.get(e.pointerId); if (!ant) return;
+    const L = layoutAtual, esc = cv.width / cv.clientWidth; if (!L) return;
+    if (toques.size === 1) { aj.dx += ((e.clientX - ant.x) * esc) / L.fw; aj.dy += ((e.clientY - ant.y) * esc) / L.fh; }
+    toques.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (toques.size === 2) { const [a, b] = [...toques.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (dist0) aj.z = Math.min(3, Math.max(1, z0 * d / dist0)); if (z) z.value = aj.z; }
+    limitar(aj); redesenhar();
+  };
+  const fim = (e) => { toques.delete(e.pointerId); if (toques.size < 2) dist0 = 0; guardarImagem(); };
+  cv.onpointerup = fim; cv.onpointercancel = fim;
+  if (z) z.onchange = guardarImagem;
 }
-// escreve e diminui a fonte até caber na largura
-function caber(c, txt, max, peso, tam, fam) {
-  let t = tam;
-  do { c.font = `${peso} ${t}px ${fam}`; t -= 2; } while (c.measureText(txt).width > max && t > 18);
+// a foto nunca deixa buraco na área: o deslocamento fica dentro da sobra da imagem
+function limitar(aj) {
+  const cv = document.getElementById("cv"); if (!cv || !pub?.img) return;
+  const L = layoutAtual, img = pub.img; if (!L) return;
+  const esc = Math.max(L.fw / img.width, L.fh / img.height) * aj.z;
+  const sx = Math.max(0, (img.width * esc - L.fw) / 2) / L.fw, sy = Math.max(0, (img.height * esc - L.fh) / 2) / L.fh;
+  aj.dx = Math.min(sx, Math.max(-sx, aj.dx)); aj.dy = Math.min(sy, Math.max(-sy, aj.dy));
 }
 
-const AZUL = "#84CC16", CIANO = "#AAF807", TXT = "#F2F5FA", MUDO = "#9AA6BC";
-const SANS = "Inter, sans-serif", TIT = "'Space Grotesk', Inter, sans-serif";
-
-// Semana de treino: de domingo 20h até o domingo seguinte 20h (igual ao Perfil)
-function inicioSemanaTreino(d = new Date()) {
-  const x = new Date(d); x.setHours(20, 0, 0, 0);
-  x.setDate(x.getDate() - x.getDay());
-  if (x > d) x.setDate(x.getDate() - 7);
-  return x;
+// posições de tudo, de baixo para cima, conforme o formato (sem esticar nada)
+function layout(W, H) {
+  const story = H > 1500, k = story ? 1 : 0.86, M = 48;
+  return { story, k, M, topoLogo: story ? 46 : 34, alturaLogo: Math.round((story ? 88 : 70)), fx: M, fy: story ? 170 : 128, fw: W - 2 * M, fh: 0 };
 }
-// Dados extras do card: comparação com o último treino da mesma ficha e quantos treinos na semana
-async function extrasDoCard({ s, ser: serHoje }) {
-  const extras = { link: location.host };
-  const ini = new Date(s.inicio);
-  const [semana, ant] = await Promise.all([
-    sb.from("sessoes").select("id, series_feitas(count)").not("fim", "is", null)
-      .gte("inicio", inicioSemanaTreino(ini).toISOString()).lte("inicio", s.inicio),
-    s.ficha_id ? sb.from("sessoes").select("id").eq("ficha_id", s.ficha_id).not("fim", "is", null)
-      .lt("inicio", s.inicio).order("inicio", { ascending: false }).limit(1) : Promise.resolve({ data: [] }),
-  ]);
-  const n = (semana.data || []).filter((x) => x.series_feitas?.[0]?.count > 0 || x.id === s.id).length;
-  if (n) extras.semana = n;
-  const antId = ant.data?.[0]?.id;
-  if (antId) {
-    const ant = q(await sb.from("series_feitas").select("exercicio_id, carga").eq("sessao_id", antId));
-    const maior = (xs, id) => Math.max(0, ...xs.filter((x) => x.exercicio_id === id).map((x) => Number(x.carga) || 0));
-    const ids = [...new Set(serHoje.map((x) => x.exercicio_id).filter(Boolean))];
-    const subiu = ids.filter((id) => { const a = maior(ant, id); return a > 0 && maior(serHoje, id) > a; }).length;   // mais carga que da última vez nesta ficha
-    if (subiu) extras.subiu = subiu;
+function quebrarLinhas(c, txt, max, linhasMax, tam0, min) {
+  for (let t = tam0; t >= min; t -= 4) {
+    c.font = `italic 800 ${t}px ${ESPORTE}`;
+    const palavras = txt.split(/\s+/); const linhas = []; let l = "";
+    for (const p of palavras) { const tenta = l ? l + " " + p : p; if (c.measureText(tenta).width <= max) l = tenta; else { if (l) linhas.push(l); l = p; } }
+    if (l) linhas.push(l);
+    if (linhas.length <= linhasMax && linhas.every((x) => c.measureText(x).width <= max)) return { linhas, t };
   }
-  return extras;
+  c.font = `italic 800 ${min}px ${ESPORTE}`;
+  return { linhas: [txt], t: min };
 }
-async function desenharCard(r, foto) {
-  const cv = document.getElementById("cv"); if (!cv) return;
-  const W = 1080, H = formato === "story" ? 1920 : formato === "post" ? 1350 : 1080;
-  cv.width = W; cv.height = H;
-  try { await document.fonts.ready; } catch { /* */ }
-  let img = null;
-  if (foto && formato !== "numeros") { try { img = await carregarImagem(foto); } catch { /* foto indisponível */ } }
-  const extras = await extrasDoCard(r).catch(() => ({ link: location.host }));
-  pintar(cv.getContext("2d"), W, H, r, img, true, extras);
-  // a imagem que vai para o compartilhamento não leva o "toque para adicionar"
-  if (!img && formato !== "numeros") {
-    const off = document.createElement("canvas"); off.width = W; off.height = H;
-    pintar(off.getContext("2d"), W, H, r, null, false, extras);
-    ultimaImagem = await new Promise((ok) => off.toBlob(ok, "image/jpeg", 0.92));
-  } else ultimaImagem = await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.92));
-}
+function pintarPublicacao(c, W, H, { s, ser, recordes }, img, aj, previa) {
+  const L = layout(W, H), { k, M, story } = L;
+  c.textBaseline = "alphabetic"; c.textAlign = "left";
+  // fundo preto com linhas finas verdes nos cantos
+  c.fillStyle = "#050505"; c.fillRect(0, 0, W, H);
+  c.strokeStyle = "rgba(181,255,0,.35)"; c.lineWidth = 2;
+  const diag = (x1, y1, x2, y2, a) => { c.globalAlpha = a; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); c.globalAlpha = 1; };
+  diag(W - 230, 0, W, 300, .5); diag(W - 170, 0, W, 210, .35);
+  diag(0, 260, 200, 0, .3);
+  diag(W, H - 380, W - 260, H, .4); diag(W, H - 300, W - 200, H, .25);
 
-// grupos trabalhados nas séries feitas, do mais para o menos. Ex.: "Peito, Costas, Ombro e Braço"
+  // ----- de baixo para cima -----
+  const base = H - (story ? 60 : 44);
+  // data à direita
+  c.fillStyle = BRANCO; c.font = `700 ${Math.round(40 * k)}px ${SANS}`; c.textAlign = "right";
+  c.fillText(new Date(s.inicio).toLocaleDateString("pt-BR"), W - M, base); c.textAlign = "left";
+  // linha verde
+  const yLinha = base - Math.round(62 * k);
+  c.fillStyle = LIMA; c.fillRect(M, yLinha, W - 2 * M, 3);
+  let y = yLinha - Math.round(40 * k);
+  // recordes (só quando tem): uma linha discreta acima da linha verde
+  if (recordes.length) {
+    const txt = recordes.slice(0, 2).map((r) => `${r.nome} ${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`).join("  ·  ");
+    c.font = `italic 700 ${Math.round(30 * k)}px ${SANS}`; c.fillStyle = LIMA;
+    let t = `🏆 ${recordes.length > 1 ? recordes.length + " RECORDES: " : "RECORDE: "}${txt}`;
+    while (c.measureText(t).width > W - 2 * M && t.length > 20) t = t.slice(0, -2);
+    c.fillText(t, M, y + 4);
+    y -= Math.round(62 * k);
+  }
+  // três indicadores
+  const nEx = new Set(ser.map((x) => x.exercicio_id || x.exercicio_nome)).size;
+  const dur = s.fim ? duracao(s.inicio, s.fim).replace(" min", "min") : "—";
+  const ind = [[dur, "DURAÇÃO"], [String(ser.length), "SÉRIES"], [String(nEx), "EXERCÍCIOS"]];
+  const colW = (W - 2 * M) / 3, hInd = Math.round(150 * k), topoInd = y - hInd;
+  ind.forEach(([v, rot], i) => {
+    const cx = M + colW * i + colW / 2;
+    c.textAlign = "center"; c.fillStyle = BRANCO;
+    let tam = Math.round(116 * k); c.font = `italic 800 ${tam}px ${ESPORTE}`;
+    while (c.measureText(v).width > colW - 30 && tam > 50) { tam -= 4; c.font = `italic 800 ${tam}px ${ESPORTE}`; }
+    c.fillText(v, cx, topoInd + Math.round(96 * k));
+    c.fillStyle = CINZA; c.font = `italic 500 ${Math.round(30 * k)}px ${SANS}`;
+    if ("letterSpacing" in c) c.letterSpacing = "4px";
+    c.fillText(rot, cx + 2, topoInd + Math.round(140 * k));
+    if ("letterSpacing" in c) c.letterSpacing = "0px";
+    if (i) { c.fillStyle = LIMA; c.fillRect(M + colW * i - 1, topoInd + 8, 3, hInd - 10); }
+  });
+  c.textAlign = "left";
+  y = topoInd - Math.round(44 * k);
+  // nome do treino (até 2 linhas, diminui se for longo)
+  const nome = (gruposTreinados(ser) || (s.ficha_nome || "Treino").replace(/^Treino\s+\S+\s*·?\s*/, "") || "Treino").toUpperCase();
+  const { linhas, t } = quebrarLinhas(c, nome, W - 2 * M, 2, Math.round(118 * k), Math.round(64 * k));
+  c.fillStyle = BRANCO; c.font = `italic 800 ${t}px ${ESPORTE}`;
+  const alt = Math.round(t * 0.98);
+  linhas.slice().reverse().forEach((ln, i) => c.fillText(ln, M, y - i * alt));
+  y -= (linhas.length - 1) * alt + t * 0.82 + Math.round(26 * k);
+  // "TREINO CONCLUÍDO" com halter
+  const hal = Math.round(34 * k);
+  halterPequeno(c, M, y - hal + 4, hal * 1.9, hal);
+  c.fillStyle = LIMA; c.font = `italic 800 ${Math.round(34 * k)}px ${SANS}`;
+  if ("letterSpacing" in c) c.letterSpacing = "6px";
+  c.fillText("TREINO CONCLUÍDO", M + hal * 1.9 + 22, y);
+  if ("letterSpacing" in c) c.letterSpacing = "0px";
+  const fundoFoto = y - Math.round(46 * k);
+
+  // ----- topo: símbolo do logo -----
+  if (simbolo) { const hL = L.alturaLogo, wL = simbolo.width * hL / simbolo.height; c.drawImage(simbolo, (W - wL) / 2, L.topoLogo, wL, hL); }
+
+  // ----- foto -----
+  const fx = L.fx, fy = L.fy, fw = L.fw, fh = Math.max(200, fundoFoto - fy), r = 34;
+  c.fillStyle = "#141414"; roundRect(c, fx, fy, fw, fh, r); c.fill();
+  if (img) {
+    c.save(); roundRect(c, fx, fy, fw, fh, r); c.clip();
+    const esc = Math.max(fw / img.width, fh / img.height) * (aj?.z || 1);
+    const w = img.width * esc, hh = img.height * esc;
+    c.drawImage(img, fx + (fw - w) / 2 + (aj?.dx || 0) * fw, fy + (fh - hh) / 2 + (aj?.dy || 0) * fh, w, hh);
+    c.restore();
+  } else if (previa) {
+    // só na prévia (não vai para a imagem salva)
+    c.textAlign = "center"; c.fillStyle = "rgba(255,255,255,.55)"; c.font = `600 ${Math.round(40 * k)}px ${SANS}`;
+    c.fillText("Toque para escolher a foto", W / 2, fy + fh / 2); c.textAlign = "left";
+  }
+  c.strokeStyle = LIMA; c.lineWidth = 4; roundRect(c, fx + 2, fy + 2, fw - 4, fh - 4, r - 2); c.stroke();
+  return { fx, fy, fw, fh };
+}
+function halterPequeno(c, x, y, w, h) {
+  c.fillStyle = LIMA;
+  const u = w / 19;
+  const ret = (xx, yy, ww, hh) => { roundRect(c, x + xx * u, y + yy, ww * u, hh, Math.min(ww * u, hh) / 3); c.fill(); };
+  ret(0, h * 0.3, 2, h * 0.4); ret(3, h * 0.1, 2.2, h * 0.8); ret(13.8, h * 0.1, 2.2, h * 0.8); ret(17, h * 0.3, 2, h * 0.4);
+  c.fillRect(x + 5.2 * u, y + h * 0.44, 8.6 * u, h * 0.12);
+}
+// grupos trabalhados nas séries feitas, do mais para o menos. Ex.: "Peito, Ombro e Braço"
 function gruposTreinados(ser) {
   const cont = {};
   ser.forEach((x) => {
@@ -670,180 +760,29 @@ function gruposTreinados(ser) {
   const gs = Object.keys(cont).sort((a, b) => cont[b] - cont[a]).slice(0, 4);
   return gs.length <= 1 ? gs[0] || "" : gs.slice(0, -1).join(", ") + " e " + gs[gs.length - 1];
 }
-function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {}) {
-  const M = 56;
-  const k = H < 1500;   // post/quadrado: tudo mais compacto para sobrar espaço para a foto
-  // fundo azul-escuro com brilhos
-  const fundo = c.createLinearGradient(0, 0, 0, H);
-  fundo.addColorStop(0, "#0E1608"); fundo.addColorStop(0.55, "#0A1006"); fundo.addColorStop(1, "#060904");
-  c.fillStyle = fundo; c.fillRect(0, 0, W, H);
-  const brilho = (x, y, raio, cor) => { const g = c.createRadialGradient(x, y, 0, x, y, raio); g.addColorStop(0, cor); g.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = g; c.fillRect(0, 0, W, H); };
-  brilho(0, 0, 520, "rgba(101,163,13,.45)");
-  brilho(W, H * 0.55, 620, "rgba(101,163,13,.22)");
-  brilho(W * 0.3, H, 700, "rgba(170,248,7,.07)");
-  c.textBaseline = "alphabetic"; c.textAlign = "left";
-
-  // topo: marca e etiqueta do treino
-  icone(c, "halter", M + 8, 52, 72, CIANO, 1.9);
-  c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(M + 104, 62, 3, 52);
-  c.fillStyle = TXT; c.font = `700 46px ${TIT}`; c.fillText("Meu Treino", M + 134, 104);
-  const nome = s.ficha_nome || "Treino";
-  const letra = (nome.match(/Treino\s+(\S+)/) || [])[1] || "";
-  if (letra) {
-    c.font = `700 38px ${SANS}`;
-    const txt = `Treino ${letra}`, tw = c.measureText(txt).width + 72;
-    const g = c.createLinearGradient(W - M - tw, 0, W - M, 0); g.addColorStop(0, "#65A30D"); g.addColorStop(1, AZUL);
-    c.save(); c.shadowColor = "rgba(132,204,22,.55)"; c.shadowBlur = 30;
-    c.fillStyle = g; roundRect(c, W - M - tw, 54, tw, 70, 35); c.fill(); c.restore();
-    c.strokeStyle = "rgba(217,249,157,.5)"; c.lineWidth = 2; roundRect(c, W - M - tw, 54, tw, 70, 35); c.stroke();
-    c.fillStyle = "#fff"; c.fillText(txt, W - M - tw + 36, 103);
-  }
-  const titulo = gruposTreinados(ser) || nome.replace(/^Treino\s+\S+\s*·?\s*/, "") || nome;
-  const nEx = new Set(ser.map((x) => x.exercicio_id || x.exercicio_nome)).size;
-
-  // de baixo para cima: recorde, números, título, data
-  let y = H - M;
-  // marca d'água com o link do app
-  if (extras.link) {
-    c.textAlign = "center"; c.fillStyle = "rgba(201,211,230,.55)"; c.font = `500 ${k ? 24 : 26}px ${SANS}`;
-    c.fillText(extras.link, W / 2, y + 22); c.textAlign = "left";
-    y -= k ? 22 : 30;
-  }
-  if (recordes.length > 1 && k) {
-    // compacto: até 3 recordes lado a lado
-    const rs = recordes.slice(0, 3), ch = 178, top = y - ch, cw = (W - 2 * M - 48) / rs.length;
-    c.save(); c.shadowColor = "rgba(34,211,238,.35)"; c.shadowBlur = 36;
-    c.fillStyle = "rgba(18,30,10,.75)"; roundRect(c, M, top, W - 2 * M, ch, 26); c.fill(); c.restore();
-    const borda = c.createLinearGradient(M, 0, W - M, 0); borda.addColorStop(0, CIANO); borda.addColorStop(1, AZUL);
-    c.strokeStyle = borda; c.lineWidth = 3; roundRect(c, M, top, W - 2 * M, ch, 26); c.stroke();
-    icone(c, "trofeu", M + 26, top + 22, 38, CIANO, 2);
-    c.fillStyle = "#C9D3E6"; c.font = `700 24px ${SANS}`;
-    if ("letterSpacing" in c) c.letterSpacing = "4px";
-    c.fillText(`${rs.length} RECORDES PESSOAIS`, M + 80, top + 50);
-    if ("letterSpacing" in c) c.letterSpacing = "0px";
-    rs.forEach((r, i) => {
-      const x0 = M + 24 + i * cw;
-      if (i) { c.fillStyle = "rgba(255,255,255,.18)"; c.fillRect(x0 - 12, top + 78, 2, ch - 100); }
-      caber(c, r.nome, cw - 24, 600, 28, SANS); c.fillStyle = TXT; c.fillText(r.nome, x0 + 4, top + 108);
-      const val = `${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`;
-      caber(c, val, cw - 24, 700, 40, SANS); c.fillStyle = CIANO; c.fillText(val, x0 + 4, top + 154);
-    });
-    y = top - 34;
-  } else if (recordes.length) {
-    const rs = recordes.slice(0, 3), linha = 64, ch = 96 + rs.length * linha, top = y - ch;
-    c.save(); c.shadowColor = "rgba(34,211,238,.35)"; c.shadowBlur = 36;
-    c.fillStyle = "rgba(18,30,10,.75)"; roundRect(c, M, top, W - 2 * M, ch, 26); c.fill(); c.restore();
-    const borda = c.createLinearGradient(M, 0, W - M, 0); borda.addColorStop(0, CIANO); borda.addColorStop(1, AZUL);
-    c.strokeStyle = borda; c.lineWidth = 3; roundRect(c, M, top, W - 2 * M, ch, 26); c.stroke();
-    icone(c, "trofeu", M + 50, top + (ch - 66) / 2, 66, CIANO, 1.8);
-    c.fillStyle = "rgba(255,255,255,.3)"; c.fillRect(M + 154, top + 38, 2, ch - 76);
-    c.fillStyle = "#C9D3E6"; c.font = `700 28px ${SANS}`;
-    if ("letterSpacing" in c) c.letterSpacing = "5px";
-    c.fillText(rs.length > 1 ? `${rs.length} RECORDES PESSOAIS` : "RECORDE PESSOAL", M + 190, top + 62);
-    if ("letterSpacing" in c) c.letterSpacing = "0px";
-    rs.forEach((r, i) => {
-      const yy = top + 62 + (i + 1) * linha;
-      const val = `${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`;
-      const tam = rs.length > 1 ? 42 : 50;
-      c.font = `700 ${tam}px ${SANS}`; const vw = c.measureText(val).width;
-      c.fillStyle = CIANO; c.fillText(val, W - M - 40 - vw, yy);
-      caber(c, r.nome, W - 2 * M - 190 - 40 - vw - 28, 700, tam, SANS);
-      c.fillStyle = TXT; c.fillText(r.nome, M + 190, yy);
-    });
-    y = top - 40;
-  }
-  // comparação com o último treino desta ficha
-  if (extras.subiu) {
-    const n = extras.subiu;
-    c.font = `600 ${k ? 30 : 34}px ${SANS}`; c.fillStyle = "#4ADE80";
-    c.fillText(`▲ Subiu a carga em ${n} exercício${n > 1 ? "s" : ""}`, M + 8, y);
-    y -= k ? 46 : 56;
-  }
-  // três cartões de números
-  const sh = k ? 124 : 146, stop = y - sh, gap = 18, livre = W - 2 * M - 2 * gap;
-  // sem recorde: só Duração e Data (as séries já aparecem na linha de cima)
-  const dados = [["cronometro", "Duração", s.fim ? duracao(s.inicio, s.fim) : "—"],
-    ...(recordes.length ? [["trofeu", "Recordes", String(recordes.length)]] : []),
-    ["calendario", "Data", new Date(s.inicio).toLocaleDateString("pt-BR")]];
-  const larg = (dados.length === 3 ? [0.31, 0.29, 0.40] : [0.42, 0.58]).map((p) => p * (W - 2 * M - (dados.length - 1) * gap));
-  let x = M;
-  dados.forEach(([ic, rot, v], i) => {
-    const w = larg[i];
-    c.fillStyle = "rgba(20,32,12,.55)"; roundRect(c, x, stop, w, sh, 22); c.fill();
-    c.strokeStyle = "rgba(170,248,7,.28)"; c.lineWidth = 2; roundRect(c, x, stop, w, sh, 22); c.stroke();
-    const it = k ? 52 : 60;
-    icone(c, ic, x + 26, stop + (sh - it) / 2, it, CIANO, 1.7);
-    c.fillStyle = "#C9D3E6"; c.font = `500 ${k ? 26 : 28}px ${SANS}`; c.fillText(rot, x + it + 44, stop + (k ? 46 : 52));
-    caber(c, v, w - it - 44 - 16, 700, k ? 44 : 50, SANS); c.fillStyle = TXT; c.fillText(v, x + it + 42, stop + (k ? 98 : 112));
-    x += w + gap;
-  });
-  y = stop - (k ? 36 : 44);
-  caber(c, titulo, W - 2 * M, 700, k ? 76 : 92, TIT);
-  c.fillStyle = TXT; c.fillText(titulo, M + 6, y);
-  y -= k ? 92 : 112;
-  c.font = `500 ${k ? 32 : 36}px ${SANS}`; c.fillStyle = "#C9D3E6";
-  const dt = `${ser.length} séries`, dw = c.measureText(dt).width;
-  c.fillText(dt, M + 8, y);
-  c.fillStyle = CIANO; c.beginPath(); c.arc(M + 8 + dw + 26, y - 12, 6, 0, Math.PI * 2); c.fill();
-  c.fillStyle = "#C9D3E6"; c.fillText(`${nEx} exercício${nEx === 1 ? "" : "s"}`, M + 8 + dw + 52, y);
-  const selo = (sx, sy) => {
-    const st = `🔥 ${extras.semana}º treino da semana`; c.font = `700 ${k ? 28 : 30}px ${SANS}`;
-    const sw = c.measureText(st).width + 44, hh = k ? 54 : 58;
-    if (sx === null) sx = W - M - sw;
-    c.fillStyle = k ? "rgba(8,14,4,.82)" : "rgba(132,204,22,.18)"; roundRect(c, sx, sy, sw, hh, hh / 2); c.fill();
-    c.strokeStyle = "rgba(170,248,7,.6)"; c.lineWidth = 2; roundRect(c, sx, sy, sw, hh, hh / 2); c.stroke();
-    c.fillStyle = TXT; c.textBaseline = "middle"; c.fillText(st, sx + 22, sy + hh / 2 + 1); c.textBaseline = "alphabetic";
-  };
-  // no story o selo fica na linha das séries; no post vai por cima da foto (sobra mais espaço)
-  if (extras.semana && !k) selo(null, y - 44);
-
-  // faixa de luz entre a foto e os dados
-  const yLuz = y - (k ? 70 : 90);
-  const luz = c.createLinearGradient(0, 0, W, 0);
-  luz.addColorStop(0, "rgba(132,204,22,0)"); luz.addColorStop(0.5, "rgba(132,204,22,.18)"); luz.addColorStop(1, "rgba(170,248,7,.7)");
-  c.strokeStyle = luz; c.lineWidth = 2; c.beginPath(); c.moveTo(0, yLuz + 30); c.quadraticCurveTo(W * 0.6, yLuz + 10, W, yLuz - 40); c.stroke();
-
-  // área da foto
-  const fx = M, fy = k ? 156 : 170, fw = W - 2 * M, fh = yLuz - (k ? 20 : 30) - fy;
-  if (formato === "numeros") {
-    // sem foto: halter grande e discreto no espaço livre
-    if (fh > 160) { const t = Math.min(fh * 0.9, 260); c.globalAlpha = 0.18; icone(c, "halter", W / 2 - t / 2, fy + (fh - t) / 2, t, CIANO, 1.2); c.globalAlpha = 1; }
-    if (extras.semana && k) selo(fx, fy);
-    return;
-  }
-  if (fh < 200) { if (extras.semana && k) selo(null, fy); return; }
-  if (img) {
-    c.save(); roundRect(c, fx, fy, fw, fh, 36); c.clip();
-    const esc = Math.max(fw / img.width, fh / img.height), w = img.width * esc, hh = img.height * esc;
-    c.drawImage(img, fx + (fw - w) / 2, fy + (fh - hh) / 2, w, hh);
-    c.restore();
-    c.strokeStyle = "rgba(170,248,7,.35)"; c.lineWidth = 2; roundRect(c, fx, fy, fw, fh, 36); c.stroke();
-  } else {
-    c.fillStyle = "rgba(20,32,12,.35)"; roundRect(c, fx, fy, fw, fh, 36); c.fill();
-    c.save(); if (previa) c.setLineDash([10, 9]); c.strokeStyle = "rgba(148,163,184,.55)"; c.lineWidth = 2.5; roundRect(c, fx, fy, fw, fh, 36); c.stroke(); c.restore();
-    const cy = fy + fh / 2;
-    c.textAlign = "center";
-    if (fh < 380) {   // pouco espaço: só um texto
-      c.fillStyle = TXT; c.font = `700 52px ${TIT}`; c.fillText(previa ? "Toque para adicionar foto" : "Treino concluído", W / 2, cy + 18);
-    } else if (previa) {
-      icone(c, "camera", W / 2 - 60, cy - 160, 120, "#DCE6F5", 1.4);
-      c.fillStyle = CIANO; c.beginPath(); c.arc(W / 2, cy - 160 + 65, 18, 0, Math.PI * 2); c.lineWidth = 6; c.strokeStyle = CIANO; c.stroke();
-      c.fillStyle = TXT; c.font = `700 58px ${TIT}`; c.fillText("Sua foto do treino", W / 2, cy + 32);
-      c.fillStyle = MUDO; c.font = `500 36px ${SANS}`; c.fillText("Toque para adicionar", W / 2, cy + 92);
-    } else {
-      icone(c, "halter", W / 2 - 80, cy - 140, 160, "rgba(34,211,238,.55)", 1.4);
-      c.fillStyle = TXT; c.font = `700 58px ${TIT}`; c.fillText("Treino concluído", W / 2, cy + 80);
-    }
-    c.textAlign = "left";
-  }
-  if (extras.semana && k) selo(fx + 22, fy + 22);
+// desenha a prévia (com "toque para escolher" se faltar foto) e guarda a imagem limpa para salvar/compartilhar
+function redesenhar() {
+  const cv = document.getElementById("cv"); if (!cv || !pub) return;
+  const W = 1080, H = formato === "story" ? 1920 : 1350;
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  layoutAtual = pintarPublicacao(cv.getContext("2d"), W, H, pub.r, pub.img, ajuste[pub.id], true);
+  clearTimeout(redesenhar.t); redesenhar.t = setTimeout(guardarImagem, 250);
 }
+function guardarImagem() {
+  if (!pub) return;
+  const W = 1080, H = formato === "story" ? 1920 : 1350;
+  const off = document.createElement("canvas"); off.width = W; off.height = H;
+  pintarPublicacao(off.getContext("2d"), W, H, pub.r, pub.img, ajuste[pub.id], false);
+  off.toBlob((b) => { if (b) ultimaImagem = b; }, "image/png");
+}
+
 export function definirImagem(b) { ultimaImagem = b; }
 export function roundRect(c, x, y, w, hh, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + hh, r); c.arcTo(x + w, y + hh, x, y + hh, r); c.arcTo(x, y + hh, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 
 acoes.compartilhar = async () => {
   if (!ultimaImagem) return toast("A imagem ainda está sendo montada");
-  const arq = new File([ultimaImagem], "meu-treino.jpg", { type: "image/jpeg" });
+  const png = ultimaImagem.type === "image/png";
+  const arq = new File([ultimaImagem], png ? "meu-treino.png" : "meu-treino.jpg", { type: ultimaImagem.type || "image/jpeg" });
   if (navigator.canShare && navigator.canShare({ files: [arq] })) {
     try { await navigator.share({ files: [arq], title: "Meu Treino" }); } catch { /* cancelado */ }
   } else acoes.salvarImg();
@@ -851,6 +790,6 @@ acoes.compartilhar = async () => {
 acoes.salvarImg = () => {
   if (!ultimaImagem) return;
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(ultimaImagem); a.download = "meu-treino.jpg"; a.click();
+  a.href = URL.createObjectURL(ultimaImagem); a.download = ultimaImagem.type === "image/png" ? "meu-treino.png" : "meu-treino.jpg"; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 };

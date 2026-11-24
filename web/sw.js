@@ -1,6 +1,6 @@
 // Service worker simples: guarda os arquivos do app para abrir rápido.
-const CACHE = "meu-treino-v49";
-const ARQUIVOS = ["./", "index.html", "style.css", "app.js", "util.js", "treino.js", "print.js", "evolucao.js", "admin.js", "conquistas.js", "midia.js", "perfil.js", "fila.js", "lembrete.js", "texto.js", "boasvindas.js", "termos.html", "config.js", "manifest.json", "icon.svg", "logo.png", "icon-180.png"];
+const CACHE = "meu-treino-v50";
+const ARQUIVOS = ["./", "index.html", "style.css", "app.js", "util.js", "treino.js", "print.js", "evolucao.js", "admin.js", "conquistas.js", "midia.js", "perfil.js", "fila.js", "lembrete.js", "texto.js", "boasvindas.js", "termos.html", "config.js", "manifest.json", "icon.svg", "logo.png", "icon-180.png", "simbolo.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));

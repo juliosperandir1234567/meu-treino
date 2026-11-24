@@ -474,3 +474,9 @@ body:has(.login) { background: #0A0F05; }
 .lg-rodape p { margin: 0; color: #8C977E; font-size: 13px; }
 .lg-rodape a { color: #A3AE94; font-size: 13px; }
 @keyframes lgEntra { 0% { transform: scale(.4) rotate(-14deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+/* compartilhar treino */
+.pub-prev { max-width: 300px; border-radius: 14px; touch-action: none; cursor: grab; }
+.pub-ctl { display: flex; flex-direction: column; gap: 10px; }
+.pub-zoom { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; color: var(--mudo); }
+.pub-zoom input { flex: 1; accent-color: #65A30D; }
+button.link { background: none; border: 0; padding: 0; color: var(--ac); font: inherit; font-weight: 600; text-decoration: underline; }
