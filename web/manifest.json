@@ -3,12 +3,27 @@
   "short_name": "Meu Treino",
   "start_url": "./#/perfil",
   "display": "standalone",
-  "background_color": "#2563EB",
+  "background_color": "#0A0F05",
   "theme_color": "#F3F6FB",
   "lang": "pt-BR",
   "icons": [
-    { "src": "icon-180.png?v=2", "sizes": "180x180", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-180.png?v=3",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png?v=3",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png?v=3",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
