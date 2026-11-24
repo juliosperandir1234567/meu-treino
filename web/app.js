@@ -39,19 +39,30 @@ document.addEventListener("submit", (e) => {
 
 // ---------- rotas ----------
 
-async function rota() {
+// tela de erro com o menu de baixo e botão para tentar de novo (nunca deixa a pessoa presa)
+function telaErro(msg = "Não consegui carregar agora.") {
+  const aba = ["#/evolucao", "#/semana", "#/avaliacao"].includes(location.hash.split("?")[0]) ? "#/evolucao" : location.hash.startsWith("#/perfil") ? "#/perfil" : "#/hoje";
+  render(`<section class="tela"><div class="vazio"><p>${h(msg)}</p><p class="mini mudo" style="margin:0">Pode ser a internet oscilando. Tente de novo.</p>
+    <button class="btn pri" data-acao="verificarDeNovo">Tentar de novo</button></div></section>${nav(aba)}`);
+}
+const buscarPerfil = async () => q(await sb.from("perfis").select("*").eq("id", sessao.user.id).maybeSingle());
+async function rota(tentou = false) {
   if (limpeza.fn) { try { limpeza.fn(); } catch { /* */ } limpeza.fn = null; }
   if (!configOk) return telaConfig();
   if (!sessao.user) return telaLogin();
   if (!sessao.perfil || sessao.perfil.id !== sessao.user.id) {
     const chP = "perfil-" + sessao.user.id;
     try {
-      sessao.perfil = q(await sb.from("perfis").select("*").eq("id", sessao.user.id).maybeSingle());
+      let p;
+      // ao abrir o app depois de horas o acesso pode estar vencendo: renova e tenta de novo uma vez
+      try { p = await buscarPerfil(); } catch (e1) { if (!navigator.onLine) throw e1; await sb.auth.refreshSession().catch(() => {}); p = await buscarPerfil(); }
+      sessao.perfil = p;
       try { localStorage.setItem(chP, JSON.stringify(sessao.perfil)); } catch { /* */ }
     } catch (e) {
-      // sem internet: usa o perfil guardado (o servidor continua conferindo tudo quando voltar)
+      // sem internet ou falha: usa o perfil guardado (o servidor continua conferindo tudo quando voltar)
       let g = null; try { g = JSON.parse(localStorage.getItem(chP)); } catch { /* */ }
-      if (g) sessao.perfil = g; else erro(e, "Não consegui verificar sua conta");
+      if (g) sessao.perfil = g;
+      else { sessao.perfil = null; return navigator.onLine ? telaErro("Não consegui verificar sua conta.") : telaSemInternet(); }
     }
   }
   const bloqueio = motivoBloqueio(sessao.perfil);
@@ -93,11 +104,13 @@ async function rota() {
       if (m) return telaBloqueada(m);
     }
     if (!navigator.onLine) return telaSemInternet();
-    erro(e, "Erro ao abrir a tela");
-    render(`<section class="tela"><div class="vazio"><p>Não consegui carregar.</p><a class="btn" href="#/hoje">Voltar ao início</a></div></section>`);
+    // primeira falha: renova o acesso e tenta mais uma vez antes de mostrar erro
+    if (!tentou) { await sb.auth.refreshSession().catch(() => {}); return rota(true); }
+    console.error(e);
+    telaErro();
   }
 }
-window.addEventListener("hashchange", rota);
+window.addEventListener("hashchange", () => rota());
 
 // Sem internet: mostra a última tela Hoje guardada (dá para começar um treino) ou um aviso.
 const chHoje = () => "hoje-html-" + sessao.user?.id;
@@ -111,15 +124,18 @@ function telaSemInternet() {
 }
 window.addEventListener("offline", () => toast("Sem internet: pode continuar o treino, ele fica salvo no celular", 4000));
 
+// só reage a entrar/sair depois da primeira abertura terminar (evita abrir duas vezes ao mesmo tempo)
+let pronto = false;
 sb.auth.onAuthStateChange((_ev, s) => {
   const antes = sessao.user?.id;
   sessao.user = s?.user || null;
-  if (antes !== sessao.user?.id) { sessao.perfil = null; esquecerTelas(); rota(); }
+  if (pronto && antes !== sessao.user?.id) { sessao.perfil = null; esquecerTelas(); rota(); }
 });
 // ao abrir o app (sem tela escolhida no link) começa no Treino
 if (["", "#", "#/", "#/perfil"].includes(location.hash)) history.replaceState(null, "", "#/hoje");
 (async () => {
-  if (configOk) { const { data } = await sb.auth.getSession(); sessao.user = data.session?.user || null; }
+  if (configOk) { try { const { data } = await sb.auth.getSession(); sessao.user = data.session?.user || null; } catch { /* sem sessão */ } }
+  pronto = true;
   rota();
   setTimeout(perguntarTreinoAberto, 600);
 })();
