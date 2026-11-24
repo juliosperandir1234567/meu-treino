@@ -43,7 +43,10 @@ export function mostrarGuardada() {
   return false;
 }
 export function esquecerTelas() { guardadas.clear(); mostrandoGuardada = null; telasDoUsuario = null; }
+// logo pequeno no alto de todas as telas (menos login e treino em andamento, que já têm o seu topo)
+const comLogo = (html) => html.includes('class="marca-topo"') ? html : html.replace('<section class="tela">', '<section class="tela"><div class="marca-topo"><span class="mt-logo" role="img" aria-label="Meu Treino"></span></div>');
 export function render(html) {
+  html = comLogo(html);
   if (document.getElementById("folha")) fecharFolha();
   const k = chaveTela(), antes = guardadas.get(k);
   if (ABAS.has(k.split("?")[0])) { guardadas.set(k, html); if (NO_CELULAR.has(k)) salvarTelasNoCelular(); }
@@ -52,7 +55,7 @@ export function render(html) {
   mostrandoGuardada = null;
   app().innerHTML = html; window.scrollTo(0, 0);
 }
-export function renderSemRolar(html) { app().classList.remove("trocando"); const y = window.scrollY; app().innerHTML = html; window.scrollTo(0, y); }
+export function renderSemRolar(html) { html = comLogo(html); app().classList.remove("trocando"); const y = window.scrollY; app().innerHTML = html; window.scrollTo(0, y); }
 export function ir(hash) { if (location.hash === hash) window.dispatchEvent(new HashChangeEvent("hashchange")); else location.hash = hash; }
 
 export function h(v) {

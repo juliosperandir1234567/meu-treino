@@ -202,6 +202,9 @@ function cartaoExercicio(ex, i, t) {
 }
 // ---------- exercícios adicionados no treino (cardio e musculação) ----------
 const CARDIOS = [["Bicicleta", "🚴"], ["Esteira", "🏃"], ["Escada", "🪜"], ["Elíptico", "⚙️"], ["Corrida", "👟"], ["Outro", "➕"]];
+const ESCADA_PATHS = ["M3 21h18", "M5 21v-3h4v-3h4v-3h4", "M17 12V4", "M14 4h6", "M19 21V8"];
+const ESCADA_SVG = `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ESCADA_PATHS.map((d) => `<path d="${d}"/>`).join("")}</svg>`;
+const iconeCardio = (nome) => (/escada/i.test(nome || "") ? ESCADA_SVG : emojiCardio(nome));
 export const emojiCardio = (nome) => (CARDIOS.find(([n]) => normal(nome).includes(normal(n))) || [0, "🔥"])[1];
 const ehEscada = (nome) => /escada/i.test(nome || "");
 const extraSemFicha = (id) => String(id).startsWith("x-");
@@ -211,7 +214,7 @@ function cartaoCardio(ex, i) {
   const vT = f ? (f.tempo_seg ? Math.round(f.tempo_seg / 60) : "") : rasc[k + "-t"] ?? "";
   const vD = f ? (ehEscada(ex.nome) ? f.andares ?? "" : f.distancia_km ?? "") : rasc[k + "-d"] ?? "";
   return `<div class="ex-bloco cardio ${ex.extra ? "extra" : ""} ${f ? "completo" : ""}" id="ex-${i}">
-    <div class="ex-cab"><span class="ex-foto cardio-ic">${emojiCardio(ex.nome)}</span>
+    <div class="ex-cab"><span class="ex-foto cardio-ic">${iconeCardio(ex.nome)}</span>
       <div class="ex-tit"><b>${h(ex.nome)}</b><span>Cardio</span></div>
       ${ex.extra ? `<span class="selo-extra">ADICIONADO HOJE</span>` : ""}</div>
     <div class="cardio-campos ${f ? "feito" : ""}">
@@ -250,7 +253,7 @@ acoes.feitoCardio = (el) => {
 let addAba = "cardio", addTipo = "Bicicleta";
 function folhaAdicionar() {
   const corpo = addAba === "cardio" ? `
-    <div class="add-tipos">${CARDIOS.map(([n, e]) => `<button class="add-tipo ${addTipo === n ? "at" : ""}" data-acao="addTipo" data-t="${n}"><i>${e}</i>${n}</button>`).join("")}</div>
+    <div class="add-tipos">${CARDIOS.map(([n, e]) => `<button class="add-tipo ${addTipo === n ? "at" : ""}" data-acao="addTipo" data-t="${n}"><i>${iconeCardio(n) === ESCADA_SVG ? ESCADA_SVG : e}</i>${n}</button>`).join("")}</div>
     ${addTipo === "Outro" ? `<label class="campo">Nome<input id="addNome" class="inp" placeholder="Ex.: Remo, Pular corda"></label>` : ""}
     <div class="grade2"><label class="campo">Tempo (min)<input id="addTempo" class="inp" type="number" inputmode="numeric" placeholder="20"></label>
       <label class="campo">${ehEscada(addTipo) ? "Andares" : "Distância (km)"}<input id="addDist" class="inp" type="number" inputmode="decimal" step="0.1" placeholder="${ehEscada(addTipo) ? "40" : "5"}"></label></div>` : `
@@ -313,7 +316,7 @@ function desenharTreino(rolar = false) {
 
   const html = `<section class="tela treino-lista">
     <div class="treino-topo">
-      <div class="tt-l1">${botaoVoltar("#/hoje")}<b class="tt-nome">${h(t.fichaNome)}</b><button class="btn pri tt-fim" data-acao="finalizar">Finalizar</button></div>
+      <div class="tt-l1">${botaoVoltar("#/hoje")}<span class="mt-logo" style="width:30px;height:30px;flex:none" role="img" aria-label="Meu Treino"></span><b class="tt-nome">${h(t.fichaNome)}</b><button class="btn pri tt-fim" data-acao="finalizar">Finalizar</button></div>
       <div class="tt-stats">
         <div><span>Duração</span><strong id="decorrido" class="ac">${mmss((Date.now() - new Date(D.s.inicio)) / 1000)}</strong></div>
         <div><span>Séries</span><strong>${D.feitas.length} de ${previstas}</strong></div>
@@ -797,12 +800,25 @@ function pintarPublicacao(c, W, H, { s, ser, recordes }, img, aj, previa) {
     cardio.set(x.exercicio_nome, v);
   });
   if (cardio.size) {
-    const itens = [...cardio.entries()].map(([n, v]) => `${emojiCardio(n)} ${n}${v.d ? " " + fmt(v.d) + " km" : v.a ? " " + v.a + " andares" : ""}${v.t ? " · " + Math.round(v.t / 60) + " min" : ""}`);
-    let tam = Math.round(30 * k), txt = itens.join("    ");
+    const itens = [...cardio.entries()].map(([n, v]) => ({ escada: /escada/i.test(n), ic: emojiCardio(n),
+      txt: `${n}${v.d ? " " + fmt(v.d) + " km" : v.a ? " " + v.a + " andares" : ""}${v.t ? " · " + Math.round(v.t / 60) + " min" : ""}` }));
+    const larg = (xs, tam) => xs.reduce((s, it) => s + tam * 1.25 + c.measureText(it.txt).width, 0) + (xs.length - 1) * tam * 1.3;
+    let tam = Math.round(30 * k), lista = itens, mais = 0;
     c.font = `italic 700 ${tam}px ${SANS}`;
-    while (c.measureText(txt).width > W - 2 * M && tam > Math.round(24 * k)) { tam--; c.font = `italic 700 ${tam}px ${SANS}`; }
-    for (let n = itens.length - 1; c.measureText(txt).width > W - 2 * M && n >= 1; n--) txt = itens.slice(0, n).join("    ") + `   +${itens.length - n}`;
-    c.fillStyle = BRANCO; c.fillText(txt, M, y + 4);
+    while (larg(lista, tam) > W - 2 * M && tam > Math.round(24 * k)) { tam--; c.font = `italic 700 ${tam}px ${SANS}`; }
+    while (lista.length > 1 && larg(lista, tam) + tam * 2 > W - 2 * M) { lista = lista.slice(0, -1); mais = itens.length - lista.length; }
+    let x = M; c.fillStyle = BRANCO;
+    lista.forEach((it) => {
+      if (it.escada) {
+        c.save(); c.translate(x, y + 4 - tam * 0.9); c.scale(tam / 24, tam / 24);
+        c.strokeStyle = BRANCO; c.lineWidth = 2.2; c.lineCap = "round"; c.lineJoin = "round";
+        ESCADA_PATHS.forEach((d) => c.stroke(new Path2D(d))); c.restore();
+      } else c.fillText(it.ic, x, y + 4);
+      x += tam * 1.25;
+      c.fillText(it.txt, x, y + 4);
+      x += c.measureText(it.txt).width + tam * 1.3;
+    });
+    if (mais) c.fillText(`+${mais}`, x, y + 4);
     y -= Math.round(62 * k);
   }
   // três indicadores

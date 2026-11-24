@@ -499,3 +499,9 @@ button.link { background: none; border: 0; padding: 0; color: var(--ac); font: i
 .add-tipo.at { border: 2px solid var(--lima); background: #F7FEE7; }
 .add-chk { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; }
 .add-chk input { width: 20px; height: 20px; accent-color: #65A30D; }
+
+/* logo no alto das telas */
+.marca-topo { display: flex; justify-content: center; margin: -6px 0 -4px; }
+.mt-logo { width: 34px; height: 34px; border-radius: 9px; background: url(logo.png) center/cover; box-shadow: 0 4px 12px rgba(132,204,22,.25); }
+.cardio-ic svg { color: #3F6212; }
+.add-tipo i svg { color: #3F6212; }
