@@ -571,7 +571,8 @@ let layoutAtual = null;     // área da foto no último desenho (para arrastar e
 const LIMA = "#B5FF00", BRANCO = "#FFFFFF", CINZA = "#C9CCC4";
 const ESPORTE = "'Barlow Condensed', 'Arial Narrow', sans-serif", SANS = "Inter, sans-serif";
 let simbolo = null;
-const carregarSimbolo = () => simbolo || (simbolo = carregarImagem("logo.png").catch(() => null));
+let simboloP = null;
+const carregarSimbolo = () => simboloP || (simboloP = carregarImagem("logo.png").then((i) => (simbolo = i), () => null));
 
 export async function telaPublicar(id) {
   if (formato !== "story" && formato !== "post") formato = "story";
