@@ -20,7 +20,7 @@ const guardadas = new Map();
 let mostrandoGuardada = null;
 // também ficam no celular: na primeira abertura do app a aba aparece na hora (e atualiza em seguida)
 const NO_CELULAR = new Set(["#/hoje", "#/evolucao", "#/semana", "#/avaliacao", "#/perfil"]);
-const chTelas = () => "telas-" + (sessao.user?.id || "");
+const chTelas = () => "telas-v2-" + (sessao.user?.id || "");   // v2: a v1 podia ter guardado a tela errada
 let telasDoUsuario = null;
 function lerTelasDoCelular() {
   if (telasDoUsuario === chTelas()) return;
@@ -45,7 +45,11 @@ export function mostrarGuardada() {
 export function esquecerTelas() { guardadas.clear(); mostrandoGuardada = null; telasDoUsuario = null; }
 // logo pequeno no alto de todas as telas (menos login e treino em andamento, que já têm o seu topo)
 const comLogo = (html) => html.includes('class="marca-topo"') ? html : html.replace('<section class="tela">', '<section class="tela"><div class="marca-topo"><span class="mt-logo" role="img" aria-label="Meu Treino"></span></div>');
+// tela que está sendo aberta: se a pessoa já foi para outra, o desenho atrasado da anterior é descartado
+export const rotaAtual = { hash: null };
+const atrasada = () => rotaAtual.hash !== null && location.hash !== rotaAtual.hash;
 export function render(html) {
+  if (atrasada()) return;
   html = comLogo(html);
   if (document.getElementById("folha")) fecharFolha();
   const k = chaveTela(), antes = guardadas.get(k);
@@ -55,7 +59,7 @@ export function render(html) {
   mostrandoGuardada = null;
   app().innerHTML = html; window.scrollTo(0, 0);
 }
-export function renderSemRolar(html) { html = comLogo(html); app().classList.remove("trocando"); const y = window.scrollY; app().innerHTML = html; window.scrollTo(0, y); }
+export function renderSemRolar(html) { if (atrasada()) return; html = comLogo(html); app().classList.remove("trocando"); const y = window.scrollY; app().innerHTML = html; window.scrollTo(0, y); }
 export function ir(hash) { if (location.hash === hash) window.dispatchEvent(new HashChangeEvent("hashchange")); else location.hash = hash; }
 
 export function h(v) {

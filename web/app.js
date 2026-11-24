@@ -1,6 +1,6 @@
 // Meu Treino — rotas, login, tela Hoje, fichas e edição de exercícios.
 import {
-  sb, configOk, sessao, acoes, limpeza, mudancas, render, renderSemRolar, corpoSvg, mostrarGuardada, esquecerTelas, ir, h, toast, erro, q, num, fmt, kg,
+  sb, configOk, sessao, acoes, limpeza, mudancas, render, renderSemRolar, corpoSvg, mostrarGuardada, esquecerTelas, rotaAtual, ir, h, toast, erro, q, num, fmt, kg,
   dataLonga, inicioSemana, ico, botaoVoltar, nav, treinoAtivo, salvarTreinoAtivo, grupoDe, abrirFolha, fecharFolha, nomeDoTreino, inicioSemanaTreino,
 } from "./util.js";
 import { telaTreino, telaEquipamento, telaFim, telaPublicar, iniciarTreino, guardarParaSemInternet } from "./treino.js";
@@ -47,6 +47,7 @@ function telaErro(msg = "Não consegui carregar agora.") {
 }
 const buscarPerfil = async () => q(await sb.from("perfis").select("*").eq("id", sessao.user.id).maybeSingle());
 async function rota(tentou = false) {
+  rotaAtual.hash = location.hash;
   if (limpeza.fn) { try { limpeza.fn(); } catch { /* */ } limpeza.fn = null; }
   if (!configOk) return telaConfig();
   if (!sessao.user) return telaLogin();
