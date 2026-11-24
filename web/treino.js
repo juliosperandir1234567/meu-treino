@@ -2,7 +2,7 @@
 import {
   sb, acoes, mudancas, limpeza, render, renderSemRolar, ir, h, toast, q, num, fmt, kg, hora, mmss, duracao,
   metaReps, ico, botaoVoltar, treinoAtivo, salvarTreinoAtivo, fotoUrl, fotoUrls, reduzir, enviarFoto, escolherFoto,
-  carregarImagem, grupoDe, corpoSvg, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha, grafico,
+  carregarImagem, grupoDe, corpoSvg, normal, bip, destravarAudio, manterTelaLigada, comemorar, abrirFolha, fecharFolha, grafico,
 } from "./util.js";
 import { exImg, carregarMidia, preencherMidia, musculosDe } from "./midia.js";
 import { idNovo, enfileirar, enviar, pendentes, aoMudarFila } from "./fila.js";
@@ -80,6 +80,9 @@ async function carregar(t) {
     try { t.inicio = q(await sb.from("sessoes").select("inicio").eq("id", t.sessaoId).single()).inicio; } catch { t.inicio = new Date().toISOString(); }
     salvarTreinoAtivo(t);
   }
+  // exercícios adicionados durante este treino (os guardados na ficha já podem ter vindo do servidor)
+  const extras = (t.extras || []).filter((x) => !exs.some((e) => e.id === x.id));
+  exs = exs.map((e) => ((t.extras || []).some((x) => x.id === e.id) ? { ...e, extra: true } : e)).concat(extras);
   D = { sessaoId: t.sessaoId, s: { inicio: t.inicio }, exs, eqs, feitas: t.feitas, hist, urls, avisos: [], avisouAcima: {} };
   // imagens do movimento: chegam em segundo plano e entram na tela sem atrapalhar
   carregarMidia(exs.map((e) => e.nome)).then(() => preencherMidia()).catch(() => {});
@@ -152,6 +155,7 @@ function recordesHoje() {
   return n;
 }
 function cartaoExercicio(ex, i, t) {
+  if (ex.tipo === "cardio") return cartaoCardio(ex, i);
   const opcao = t.opcoes[ex.id] || 1;
   const feitas = D.feitas.filter((x) => x.exercicio_id === ex.id);
   const uv = ultimaVez(ex.id, opcao);
@@ -181,10 +185,11 @@ function cartaoExercicio(ex, i, t) {
       <div class="linha" style="gap:6px"><button class="btn peq pri" data-acao="novaCarga" data-ex="${i}" data-carga="${a.carga}">Sim</button><button class="btn peq" data-acao="fecharAviso" data-id="${a.id}">Só hoje</button></div></div>` : `
     <div class="aviso-ex lar"><span>${h(a.txt)}</span><button class="ico" style="width:30px;height:30px" data-acao="fecharAviso" data-id="${a.id}" aria-label="Fechar aviso">✕</button></div>`).join("");
   const musc = [...new Set(musculosDe(ex.nome).map((m) => m.nome))].slice(0, 3).join(" · ");
-  return `<div class="ex-bloco ${completo ? "completo" : ""}" id="ex-${i}">
+  return `<div class="ex-bloco ${ex.extra ? "extra" : ""} ${completo ? "completo" : ""}" id="ex-${i}">
     <div class="ex-cab">
       <button class="ex-foto" data-acao="exMais" data-ex="${i}" aria-label="Detalhes de ${h(ex.nome)}">${exImg(ex.nome)}</button>
       <button class="ex-tit" data-acao="exMais" data-ex="${i}"><b>${h(ex.nome)}</b><span>${musc || `${ex.series} × ${h(ex.reps)}`}</span></button>
+      ${ex.extra ? `<span class="selo-extra">ADICIONADO HOJE</span>` : ""}
       ${completo ? `<span class="ex-ok">${ico("check", 16, 'stroke-width="3"')}</span>` : ""}
       <button class="ico ex-mais" data-acao="exMais" data-ex="${i}" aria-label="Mais opções">⋯</button>
     </div>
@@ -195,6 +200,97 @@ function cartaoExercicio(ex, i, t) {
     <button class="btn peq blk add-serie" data-acao="maisSerie" data-ex="${i}">${ico("mais", 16)} Adicionar série</button>
   </div>`;
 }
+// ---------- exercícios adicionados no treino (cardio e musculação) ----------
+const CARDIOS = [["Bicicleta", "🚴"], ["Esteira", "🏃"], ["Escada", "🪜"], ["Elíptico", "⚙️"], ["Corrida", "👟"], ["Outro", "➕"]];
+export const emojiCardio = (nome) => (CARDIOS.find(([n]) => normal(nome).includes(normal(n))) || [0, "🔥"])[1];
+const ehEscada = (nome) => /escada/i.test(nome || "");
+const extraSemFicha = (id) => String(id).startsWith("x-");
+function cartaoCardio(ex, i) {
+  const f = D.feitas.find((x) => x.exercicio_id === ex.id);
+  const k = ex.id;
+  const vT = f ? (f.tempo_seg ? Math.round(f.tempo_seg / 60) : "") : rasc[k + "-t"] ?? "";
+  const vD = f ? (ehEscada(ex.nome) ? f.andares ?? "" : f.distancia_km ?? "") : rasc[k + "-d"] ?? "";
+  return `<div class="ex-bloco cardio ${ex.extra ? "extra" : ""} ${f ? "completo" : ""}" id="ex-${i}">
+    <div class="ex-cab"><span class="ex-foto cardio-ic">${emojiCardio(ex.nome)}</span>
+      <div class="ex-tit"><b>${h(ex.nome)}</b><span>Cardio</span></div>
+      ${ex.extra ? `<span class="selo-extra">ADICIONADO HOJE</span>` : ""}</div>
+    <div class="cardio-campos ${f ? "feito" : ""}">
+      <label><span>TEMPO (min)</span><input id="cd-t-${i}" type="number" inputmode="numeric" value="${h(vT)}" ${f ? "disabled" : `data-muda="rascunho" data-k="${k}-t"`}></label>
+      <label><span>${ehEscada(ex.nome) ? "ANDARES" : "DISTÂNCIA (km)"}</span><input id="cd-d-${i}" type="number" inputmode="decimal" step="0.1" value="${h(vD)}" ${f ? "disabled" : `data-muda="rascunho" data-k="${k}-d"`}></label>
+      <button class="ok" data-acao="feitoCardio" data-ex="${i}" aria-label="${f ? "Desfazer" : "Marcar como feito"}">${ico("check", 18, 'stroke-width="3"')}</button>
+    </div>
+  </div>`;
+}
+function registrarCardio(ex, minutos, valor) {
+  const t = treinoAtivo();
+  const linha = {
+    id: idNovo(), sessao_id: t.sessaoId, exercicio_id: ex.id, exercicio_nome: ex.nome, equipamento_opcao: 1, numero: 1,
+    carga: null, reps: null, descanso_seg: null, feita_em: new Date().toISOString(),
+    tempo_seg: minutos ? Math.round(minutos * 60) : null,
+    distancia_km: !ehEscada(ex.nome) && valor ? valor : null,
+    andares: ehEscada(ex.nome) && valor ? Math.round(valor) : null,
+  };
+  enfileirar({ tipo: "ins", tab: "series_feitas", id: linha.id, dados: { ...linha, exercicio_id: extraSemFicha(ex.id) ? null : ex.id } });
+  D.feitas.push(linha); t.feitas = D.feitas; salvarTreinoAtivo(t);
+}
+acoes.feitoCardio = (el) => {
+  const t = treinoAtivo(); const i = Number(el.dataset.ex); const ex = D.exs[i];
+  const ja = D.feitas.find((x) => x.exercicio_id === ex.id);
+  if (ja) {
+    enfileirar({ tipo: "del", tab: "series_feitas", id: ja.id });
+    D.feitas = D.feitas.filter((x) => x.id !== ja.id); t.feitas = D.feitas; salvarTreinoAtivo(t);
+    return desenharTreino();
+  }
+  const min = num(document.getElementById(`cd-t-${i}`).value), val = num(document.getElementById(`cd-d-${i}`).value);
+  if (!min && !val) return toast("Coloque o tempo ou a distância");
+  registrarCardio(ex, min, val);
+  desenharTreino();
+};
+// janela "Adicionar exercício"
+let addAba = "cardio", addTipo = "Bicicleta";
+function folhaAdicionar() {
+  const corpo = addAba === "cardio" ? `
+    <div class="add-tipos">${CARDIOS.map(([n, e]) => `<button class="add-tipo ${addTipo === n ? "at" : ""}" data-acao="addTipo" data-t="${n}"><i>${e}</i>${n}</button>`).join("")}</div>
+    ${addTipo === "Outro" ? `<label class="campo">Nome<input id="addNome" class="inp" placeholder="Ex.: Remo, Pular corda"></label>` : ""}
+    <div class="grade2"><label class="campo">Tempo (min)<input id="addTempo" class="inp" type="number" inputmode="numeric" placeholder="20"></label>
+      <label class="campo">${ehEscada(addTipo) ? "Andares" : "Distância (km)"}<input id="addDist" class="inp" type="number" inputmode="decimal" step="0.1" placeholder="${ehEscada(addTipo) ? "40" : "5"}"></label></div>` : `
+    <label class="campo">Nome do exercício<input id="addNome" class="inp" placeholder="Ex.: Abdominal na máquina"></label>
+    <div class="grade2"><label class="campo">Séries<input id="addSeries" class="inp" type="number" inputmode="numeric" value="3"></label>
+      <label class="campo">Repetições<input id="addReps" class="inp" value="12"></label></div>`;
+  abrirFolha(`<div class="entre"><h2>Adicionar exercício</h2><button class="ico" data-acao="fecharFolha" aria-label="Fechar">✕</button></div>
+    <div class="seg-evo add-seg"><a href="#" class="${addAba === "forca" ? "at" : ""}" data-acao="addAba" data-a="forca">Musculação</a><a href="#" class="${addAba === "cardio" ? "at" : ""}" data-acao="addAba" data-a="cardio">Cardio</a></div>
+    ${corpo}
+    <label class="add-chk"><input id="addGuardar" type="checkbox"> Guardar na ficha para os próximos treinos</label>
+    <button class="btn pri blk grande" data-acao="addConfirmar">Adicionar ao treino</button>`, "Adicionar exercício");
+}
+acoes.addExercicio = () => folhaAdicionar();
+acoes.addAba = (el) => { addAba = el.dataset.a; folhaAdicionar(); };
+acoes.addTipo = (el) => { addTipo = el.dataset.t; folhaAdicionar(); };
+acoes.addConfirmar = () => {
+  const t = treinoAtivo();
+  const cardio = addAba === "cardio";
+  const nomeDigitado = (document.getElementById("addNome")?.value || "").trim();
+  const nome = cardio ? (addTipo === "Outro" ? nomeDigitado : addTipo) : nomeDigitado;
+  if (!nome) return toast("Escreva o nome do exercício");
+  const guardar = document.getElementById("addGuardar")?.checked;
+  const ex = {
+    id: guardar ? idNovo() : "x-" + idNovo(), nome, tipo: cardio ? "cardio" : "forca", extra: true,
+    series: cardio ? 1 : Math.max(1, Number(document.getElementById("addSeries")?.value) || 3),
+    reps: cardio ? "1" : String(document.getElementById("addReps")?.value || "12").trim(), carga_prevista: null, descanso_seg: cardio ? 0 : 60, obs: "",
+  };
+  const min = cardio ? num(document.getElementById("addTempo")?.value) : null;
+  const val = cardio ? num(document.getElementById("addDist")?.value) : null;
+  if (guardar) enfileirar({ tipo: "ins", tab: "exercicios", id: ex.id, dados: { id: ex.id, ficha_id: t.fichaId, ordem: D.exs.length, nome, tipo: ex.tipo, series: ex.series, reps: ex.reps, descanso_seg: ex.descanso_seg || 60 } });
+  t.extras = [...(t.extras || []), ex]; salvarTreinoAtivo(t);
+  D.exs.push(ex);
+  if (cardio && (min || val)) registrarCardio(ex, min, val);
+  fecharFolha();
+  desenharTreino();
+  const i = D.exs.length - 1;
+  setTimeout(() => document.getElementById(`ex-${i}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  toast(guardar ? "Adicionado ao treino e à ficha" : "Adicionado ao treino");
+};
+
 function desenharTreino(rolar = false) {
   const t = treinoAtivo();
   const n = D.exs.length;
@@ -228,6 +324,7 @@ function desenharTreino(rolar = false) {
       <span id="filaInfo" class="fila-info" ${pendentes() ? "" : "hidden"}>Sem internet · ${pendentes()} registros guardados no celular</span>
     </div>
     ${D.exs.map((ex, i) => cartaoExercicio(ex, i, t)).join("")}
+    <button class="add-ex" data-acao="addExercicio">${ico("mais", 18)} Adicionar exercício</button>
     <button class="btn perigo peq blk" data-acao="cancelarTreino" style="margin-top:8px">${ico("lixo", 16)} Cancelar treino</button>
   </section>
   ${descanso}`;
@@ -340,7 +437,7 @@ acoes.feitoSerie = async (el) => {
     id: idNovo(), sessao_id: t.sessaoId, exercicio_id: ex.id, exercicio_nome: ex.nome, equipamento_opcao: opcao, numero: n,
     carga, reps: reps === null ? null : Math.round(reps), descanso_seg: descanso && descanso < 1800 ? descanso : null, feita_em: agora.toISOString(),
   };
-  enfileirar({ tipo: "ins", tab: "series_feitas", id: linha.id, dados: { ...linha } });
+  enfileirar({ tipo: "ins", tab: "series_feitas", id: linha.id, dados: { ...linha, exercicio_id: extraSemFicha(ex.id) ? null : ex.id } });
   D.feitas.push(linha);
   t.feitas = D.feitas;
   t.ultimaSerie = agora.toISOString();
@@ -690,6 +787,22 @@ function pintarPublicacao(c, W, H, { s, ser, recordes }, img, aj, previa) {
       t = `🏆 ${recordes.length > 1 ? recordes.length + " RECORDES: " : "RECORDE: "}${r0.nome} ${fmt(r0.carga)} kg${r0.reps ? " × " + r0.reps : ""}${recordes.length > 1 ? `  +${recordes.length - 1}` : ""}`;
     }
     c.fillText(t, M, y + 4);
+    y -= Math.round(62 * k);
+  }
+  // cardio (bicicleta, esteira, escada...)
+  const cardio = new Map();
+  ser.filter((x) => x.tempo_seg || x.distancia_km || x.andares).forEach((x) => {
+    const v = cardio.get(x.exercicio_nome) || { t: 0, d: 0, a: 0 };
+    v.t += Number(x.tempo_seg) || 0; v.d += Number(x.distancia_km) || 0; v.a += Number(x.andares) || 0;
+    cardio.set(x.exercicio_nome, v);
+  });
+  if (cardio.size) {
+    const itens = [...cardio.entries()].map(([n, v]) => `${emojiCardio(n)} ${n}${v.d ? " " + fmt(v.d) + " km" : v.a ? " " + v.a + " andares" : ""}${v.t ? " · " + Math.round(v.t / 60) + " min" : ""}`);
+    let tam = Math.round(30 * k), txt = itens.join("    ");
+    c.font = `italic 700 ${tam}px ${SANS}`;
+    while (c.measureText(txt).width > W - 2 * M && tam > Math.round(24 * k)) { tam--; c.font = `italic 700 ${tam}px ${SANS}`; }
+    for (let n = itens.length - 1; c.measureText(txt).width > W - 2 * M && n >= 1; n--) txt = itens.slice(0, n).join("    ") + `   +${itens.length - n}`;
+    c.fillStyle = BRANCO; c.fillText(txt, M, y + 4);
     y -= Math.round(62 * k);
   }
   // três indicadores

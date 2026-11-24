@@ -296,3 +296,16 @@ create extension if not exists pg_cron;
 -- ---------- Avaliação colada em texto: ordem das linhas e nome da coluna, como vieram ----------
 alter table public.avaliacoes add column if not exists ordem text[];
 alter table public.avaliacoes add column if not exists rotulo text;
+
+-- ===== Cardio no treino (bicicleta, esteira, escada...) =====
+alter table public.series_feitas
+  add column if not exists tempo_seg int,
+  add column if not exists distancia_km numeric(7,2),
+  add column if not exists andares int;
+alter table public.exercicios
+  add column if not exists tipo text not null default 'forca';
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'exercicios_tipo_chk') then
+    alter table public.exercicios add constraint exercicios_tipo_chk check (tipo in ('forca','cardio'));
+  end if;
+end $$;
