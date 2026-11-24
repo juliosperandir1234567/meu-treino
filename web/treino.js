@@ -683,7 +683,12 @@ function pintarPublicacao(c, W, H, { s, ser, recordes }, img, aj, previa) {
     const txt = recordes.slice(0, 2).map((r) => `${r.nome} ${fmt(r.carga)} kg${r.reps ? " × " + r.reps : ""}`).join("  ·  ");
     c.font = `italic 700 ${Math.round(30 * k)}px ${SANS}`; c.fillStyle = LIMA;
     let t = `🏆 ${recordes.length > 1 ? recordes.length + " RECORDES: " : "RECORDE: "}${txt}`;
-    while (c.measureText(t).width > W - 2 * M && t.length > 20) t = t.slice(0, -2);
+    // não corta no meio: diminui a letra e, se ainda não couber, mostra o primeiro recorde e "+N"
+    for (let tam = Math.round(30 * k); tam > Math.round(24 * k) && c.measureText(t).width > W - 2 * M; tam--) c.font = `italic 700 ${tam}px ${SANS}`;
+    if (c.measureText(t).width > W - 2 * M) {
+      const r0 = recordes[0];
+      t = `🏆 ${recordes.length > 1 ? recordes.length + " RECORDES: " : "RECORDE: "}${r0.nome} ${fmt(r0.carga)} kg${r0.reps ? " × " + r0.reps : ""}${recordes.length > 1 ? `  +${recordes.length - 1}` : ""}`;
+    }
     c.fillText(t, M, y + 4);
     y -= Math.round(62 * k);
   }
