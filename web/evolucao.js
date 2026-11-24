@@ -37,6 +37,9 @@ function rotuloCurto(a) {
   return m ? `${m[1]}/${m[2]}` : dataCurta(a.data + "T12:00");
 }
 let medidaSel = null;
+// abas de cima da Evolução (Semana, Cargas e medidas, Avaliação)
+const segEvo = (at) => `<div class="evo-cab"><h1>Evolução</h1><div class="seg-evo">${[["#/semana", "Semana"], ["#/evolucao", "Cargas"], ["#/avaliacao", "Avaliação"]]
+  .map(([href, t]) => `<a href="${href}" class="${at === href ? "at" : ""}">${t}</a>`).join("")}</div></div>`;
 export async function telaEvolucao(aba, exNome) {
   // a aba de exercícios não usa as avaliações: não busca à toa
   const avs = aba === "medidas" || aba === "peso" ? q(await sb.from("avaliacoes").select("*").order("data")) : [];
@@ -89,7 +92,7 @@ export async function telaEvolucao(aba, exNome) {
     }
   }
   render(`<section class="tela">
-    <div class="col" style="gap:4px"><h1>Evolução</h1><span class="peq mudo">Meta: braço e ombro subindo, cintura descendo</span></div>
+    ${segEvo("#/evolucao")}
     <div class="abas">${[["medidas", "Medidas"], ["cargas", "Cargas"], ["peso", "Peso"]].map(([k, t]) => `<button class="${aba === k ? "at" : ""}" data-acao="abaEvo" data-a="${k}">${t}</button>`).join("")}</div>
     ${corpo}
     <a class="btn" href="#/avaliacao">${ico("pessoa", 18)} Avaliação física completa</a>
@@ -122,7 +125,8 @@ export async function telaAvaliacao() {
         <button class="ico" style="width:36px;height:36px" data-acao="apagarAv" data-id="${a.id}" aria-label="Apagar avaliação">${ico("lixo", 16)}</button></div>`).join("")}</div>`;
   }
   render(`<section class="tela">
-    <div class="topo"><div class="tit"><h1>Avaliação física</h1>${ult ? `<span class="mini mudo">${new Date(ult.data + "T12:00").toLocaleDateString("pt-BR")} · ${ult.origem === "print" ? "importada por print" : ult.origem === "texto" ? "colada em texto" : ult.origem === "casa" ? "medida em casa" : "lançada à mão"}</span>` : ""}</div></div>
+    ${segEvo("#/avaliacao")}
+    <div class="topo"><div class="tit"><h2>Avaliação física</h2>${ult ? `<span class="mini mudo">${new Date(ult.data + "T12:00").toLocaleDateString("pt-BR")} · ${ult.origem === "print" ? "importada por print" : ult.origem === "texto" ? "colada em texto" : ult.origem === "casa" ? "medida em casa" : "lançada à mão"}</span>` : ""}</div></div>
     ${corpo}
     ${ult ? `<div class="grade2"><a class="btn" href="#/medir">${ico("mais", 18)} Medir em casa</a><a class="btn pri" href="#/print?tipo=avaliacao">${ico("lista", 18)} Nova (texto ou print)</a></div>` : ""}
   </section>${nav("#/avaliacao")}`);
@@ -277,6 +281,7 @@ export async function telaSemana() {
   const comp = d.ordem.slice(0, 14).map((n) => `<span class="n">${h(n)}</span><span class="num mudo peq">${serieTxt(d.exAnt[n])}</span><span class="num"><b>${serieTxt(d.exAtual[n])}</b> ${setaComp(d.exAtual[n], d.exAnt[n])}</span>`).join("");
   const unid = d.usarVolume ? "Volume" : "Séries";
   render(`<section class="tela">
+    ${segEvo("#/semana")}
     <div class="entre" style="align-items:flex-end"><div class="col" style="gap:4px"><span class="peq mudo">${ini.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })} a ${fimSem.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}</span><h1>Sua semana</h1></div>
       <span class="chip" style="color:var(--txt)">${ico("fogo", 14, 'style="color:var(--lar);vertical-align:-2px"')} ${seq} semana${seq === 1 ? "" : "s"} seguida${seq === 1 ? "" : "s"}</span></div>
     <div class="heroi">

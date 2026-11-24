@@ -308,50 +308,39 @@ async function telaHoje() {
     return `<div class="dia2 ${cls}"><span class="n">${n}</span><span class="b">${h(letra)}</span></div>`;
   }).join("");
 
-  const chipsGrupo = (f) => f.grupos.map((g) => `<span class="chip">${h(g)}</span>`).join("");
-  let destaque;
+  const iniT = inicioSemanaTreino();
+  const naSemana = recentes.filter((s) => s.fim && new Date(s.inicio) >= iniT).length;
+  const lista = (f, max = 5) => f.nomes.length ? h(f.nomes.slice(0, max).join(", ")) + (f.nomes.length > max ? ` +${f.nomes.length - max}` : "") : "Sem exercícios ainda";
+  let destaque = "";
   if (ativo) {
-    destaque = `<div class="heroi"><span class="rot ac">Treino em andamento</span>
-      <h2 class="heroi-tit">${h(ativo.fichaNome || "Treino")}</h2>
-      <a class="btn pri blk grande" href="#/treino">${ico("play", 20)} Continuar treino</a></div>`;
+    destaque = `<div class="rot-card destaque"><div class="rc-cab"><span class="letra lima">${ico("play", 18)}</span>
+      <div class="rc-tit"><span class="chip ac">EM ANDAMENTO</span><b>${h(ativo.fichaNome || "Treino")}</b></div></div>
+      <a class="btn pri blk" href="#/treino">${ico("play", 18)} Continuar treino</a></div>`;
   } else if (prox) {
     const ultimaVez = ultimaPorFicha[prox.id];
-    destaque = `<div class="heroi">
-      <div class="entre"><span class="rot ac">Treino de hoje</span><span class="mini mudo">${ultimaVez ? "Último: " + haQuanto(ultimaVez) : "Ainda não feito"}</span></div>
-      <div class="linha" style="gap:16px;align-items:center"><span class="letra xg">${h(prox.letra)}</span>
-        <div class="col" style="gap:6px;min-width:0"><h2 class="heroi-tit">${h(prox.nome || "Treino " + prox.letra)}</h2>
-        ${prox.grupos.length ? `<div class="linha" style="gap:6px;flex-wrap:wrap">${chipsGrupo(prox)}</div>` : ""}</div></div>
-      ${prox.nomes.length ? `<div class="heroi-fotos">${prox.nomes.slice(0, 4).map((n) => exImg(n)).join("")}${prox.nomes.length > 4 ? `<span class="heroi-mais">+${prox.nomes.length - 4}</span>` : ""}</div>` : ""}
-      <div class="heroi-num">
-        <div><b>${prox.qtd}</b><span>exercícios</span></div>
-        <div><b>${prox.series}</b><span>séries</span></div>
-        <div><b>~${prox.minutos || 0}</b><span>minutos</span></div></div>
-      <button class="btn pri blk grande" data-acao="iniciar" data-ficha="${prox.id}">${ico("play", 20)} Iniciar treino</button>
-      <a class="mini mudo" style="text-align:center;text-decoration:none" href="#/ficha/${prox.id}">Ver a ficha completa ›</a></div>`;
+    destaque = `<div class="rot-card destaque"><div class="rc-cab"><span class="letra lima">${h(prox.letra)}</span>
+      <div class="rc-tit"><span class="chip ac">PRÓXIMO</span><b>${h(prox.nome || "Treino " + prox.letra)}</b></div>
+      <a class="ico rc-mais" href="#/ficha/${prox.id}" aria-label="Ver ficha">⋯</a></div>
+      <span class="rc-lista">${lista(prox)}</span>
+      <span class="rc-info">${prox.qtd} exercícios · ${prox.series} séries · ~${prox.minutos || 0} min${ultimaVez ? " · último " + haQuanto(ultimaVez) : ""}</span>
+      <button class="btn pri blk grande" data-acao="iniciar" data-ficha="${prox.id}">${ico("play", 20)} Iniciar treino</button></div>`;
   } else {
-    destaque = `<div class="heroi vazio"><span class="letra xg">${ico("camera", 30)}</span>
-      <h2>Comece pela sua ficha</h2><p class="mudo" style="margin:0">Cole o texto do seu treino (um exercício por linha) e o app monta a ficha pra você.</p>
+    destaque = `<div class="rot-card destaque"><b style="font-size:18px">Comece pela sua ficha</b>
+      <span class="rc-lista">Cole o texto do seu treino (um exercício por linha) e o app monta a ficha pra você.</span>
       <a class="btn pri blk grande" href="#/print?tipo=texto">${ico("lista", 18)} Colar meu treino</a>
       <button class="btn blk" data-acao="novaFicha">Criar ficha à mão</button></div>`;
   }
-
+  const outras = fichas.filter((f) => ativo || !prox || f.id !== prox.id);
   const htmlHoje = (`<section class="tela">
-    <div class="entre"><div class="col" style="gap:4px"><span class="peq mudo">${dataLonga()}</span>
-      <button class="nome-btn" data-acao="meuNome" aria-label="Trocar meu nome"><h1>${saudacao()}</h1></button>
-      ${(sessao.perfil?.nome || "").trim() ? "" : `<button class="btn peq" style="align-self:flex-start" data-acao="meuNome">${ico("pessoa", 16)} Como quer ser chamado?</button>`}</div>
-      <a href="#/perfil" aria-label="Meu perfil">${await avatarHtml(46)}</a></div>
+    <div class="tela-cab"><h1>Treino</h1><span class="peq mudo">Semana: ${naSemana} de ${fichas.length || 0} treinos · zera domingo 20h</span></div>
     ${destaque}
-    <a class="cartao semana-cartao" href="#/semana">
-      <div class="entre"><b>Esta semana</b><span class="linha" style="gap:8px">
-        <span class="chip">${semana.length} treino${semana.length === 1 ? "" : "s"}</span>
-        ${seq ? `<span class="chip lar">${ico("fogo", 13, 'style="vertical-align:-2px"')} ${seq} sem. seguida${seq === 1 ? "" : "s"}</span>` : ""}</span></div>
-      <div class="semana2">${dias}</div></a>
-    ${fichas.length ? `<div class="col"><div class="entre"><h3>Minhas fichas</h3><button class="btn peq" data-acao="novaFicha">${ico("mais", 16)} Nova</button></div>
-      ${fichas.map((f) => `<a class="item ficha-item ${prox && f.id === prox.id && !ativo ? "prox" : ""}" href="#/ficha/${f.id}"><span class="letra">${h(f.letra)}</span>
-        <span class="col" style="flex:1;gap:3px;min-width:0"><b>${h(f.nome || "Treino " + f.letra)}</b>
-        <span class="mini mudo">${f.grupos.length ? h(f.grupos.join(" · ")) + " · " : ""}${f.qtd} exercícios</span></span>
-        <span class="col" style="align-items:flex-end;gap:3px">${prox && f.id === prox.id && !ativo ? `<span class="chip ac">Próximo</span>` : ""}<span class="mini mudo">${ultimaPorFicha[f.id] ? haQuanto(ultimaPorFicha[f.id]) : "—"}</span></span></a>`).join("")}
-      <a class="item tracejado" href="#/print?tipo=texto"><span class="letra">${ico("lista", 18)}</span><span class="col" style="flex:1;gap:2px"><b>Atualizar treino</b><span class="mini mudo">Ficha nova? Cole o texto e o app atualiza</span></span><span class="mudo">${ico("seta", 18)}</span></a></div>` : ""}
+    ${fichas.length ? `<div class="entre sec-tit"><span>MINHAS FICHAS (${fichas.length})</span><a href="#/print?tipo=texto">+ Colar treino</a></div>
+      ${outras.map((f) => `<div class="rot-card"><div class="rc-cab"><span class="letra">${h(f.letra)}</span>
+        <a class="rc-tit" href="#/ficha/${f.id}"><b>${h(f.nome || "Treino " + f.letra)}</b><span class="mini mudo">${ultimaPorFicha[f.id] ? "Último " + haQuanto(ultimaPorFicha[f.id]) : "Ainda não feito"}</span></a>
+        <a class="ico rc-mais" href="#/ficha/${f.id}" aria-label="Ver ficha">⋯</a></div>
+        <span class="rc-lista">${lista(f)}</span>
+        <button class="btn blk" data-acao="iniciar" data-ficha="${f.id}" ${f.qtd ? "" : "disabled"}>${ico("play", 16)} Iniciar</button></div>`).join("")}
+      <button class="btn peq" style="align-self:center" data-acao="novaFicha">${ico("mais", 16)} Criar ficha à mão</button>` : ""}
   </section>
   ${nav("#/hoje")}`);
   render(htmlHoje);

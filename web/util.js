@@ -210,8 +210,9 @@ export function botaoVoltar(hash) {
   return `<a class="ico" href="${hash}" aria-label="Voltar">${ico("voltar")}</a>`;
 }
 export function nav(atual) {
-  const it = [["#/perfil", "pessoa", "Perfil"], ["#/hoje", "casa", "Hoje"], ["#/evolucao", "sobe", "Evolução"], ["#/semana", "fogo", "Semana"], ["#/avaliacao", "regua", "Avaliação"]];
-  if (atual === "#/clientes") atual = "#/perfil";
+  const it = [["#/hoje", "peso", "Treino"], ["#/evolucao", "sobe", "Evolução"], ["#/perfil", "pessoa", "Perfil"]];
+  if (["#/clientes", "#/historico", "#/conquistas", "#/lembrete"].includes(atual)) atual = "#/perfil";
+  if (["#/semana", "#/avaliacao"].includes(atual)) atual = "#/evolucao";
   return `<nav class="nav"><div style="grid-template-columns:repeat(${it.length},minmax(0,1fr))">${it.map(([href, i, t]) => `<a href="${href}" class="${atual === href ? "at" : ""}">${ico(i, 22)}${t}</a>`).join("")}</div></nav>`;
 }
 
@@ -285,8 +286,8 @@ export function grafico(valores, rotulos = [], opc = {}) {
   const marcados = todos ? pts : [pts[0], pts[pts.length - 1]];
   return `<svg class="graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de ${nb(v[0])} a ${nb(v[v.length - 1])}">
     <line x1="${pl}" y1="${H - pb}" x2="${W - pr}" y2="${H - pb}" stroke="#E1E7F0"/>
-    <polyline points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-    ${pts.map((p, k) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${k === pts.length - 1 ? 5 : 3.5}" fill="${k === pts.length - 1 ? "#2563EB" : "#FFFFFF"}" stroke="#2563EB" stroke-width="2"/>`).join("")}
+    <polyline points="${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" fill="none" stroke="#65A30D" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+    ${pts.map((p, k) => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${k === pts.length - 1 ? 5 : 3.5}" fill="${k === pts.length - 1 ? "#65A30D" : "#FFFFFF"}" stroke="#65A30D" stroke-width="2"/>`).join("")}
     ${marcados.map((p) => `<text x="${p.x.toFixed(1)}" y="${(p.y - 10).toFixed(1)}" text-anchor="${ancora(p.x)}" font-size="12" font-weight="700" fill="#0F172A">${nb(p.v)}</text>`).join("")}
     ${marcados.filter((p) => p.r).map((p) => `<text x="${p.x.toFixed(1)}" y="${H - 10}" text-anchor="${ancora(p.x)}" font-size="11" fill="#64748B">${h(p.r)}</text>`).join("")}
   </svg>`;
@@ -319,7 +320,7 @@ export async function manterTelaLigada(on) {
 // ---------- comemoração (recordes e conquistas) ----------
 export function comemorar(titulo, sub = "") {
   document.getElementById("festa")?.remove();
-  const cores = ["#2563EB", "#F59E0B", "#10B981", "#60A5FA", "#F472B6"];
+  const cores = ["#65A30D", "#F59E0B", "#10B981", "#60A5FA", "#F472B6"];
   const pedacos = Array.from({ length: 46 }, (_, i) => {
     const x = Math.random() * 100, d = 1.6 + Math.random() * 1.4, at = Math.random() * 0.5, r = Math.random() * 360;
     return `<i style="left:${x}%;background:${cores[i % cores.length]};animation-duration:${d}s;animation-delay:${at}s;transform:rotate(${r}deg)"></i>`;
@@ -377,7 +378,7 @@ const COSTAS = [
 export function corpoSvg(pct = {}, lado = null) {
   const cor = (g, peso = 1) => {
     const p = Math.max(0, Math.min(1, (pct[g] || 0) * peso));
-    return p ? `fill="#2563EB" fill-opacity="${(0.25 + 0.75 * p).toFixed(2)}"` : `fill="#C9D3E1"`;
+    return p ? `fill="#65A30D" fill-opacity="${(0.25 + 0.75 * p).toFixed(2)}"` : `fill="#C9D3E1"`;
   };
   const contorno = suave(CONTORNO);
   const figura = (x0, musc, rotulo) => {

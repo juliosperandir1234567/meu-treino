@@ -608,7 +608,7 @@ function caber(c, txt, max, peso, tam, fam) {
   do { c.font = `${peso} ${t}px ${fam}`; t -= 2; } while (c.measureText(txt).width > max && t > 18);
 }
 
-const AZUL = "#3B82F6", CIANO = "#22D3EE", TXT = "#F2F5FA", MUDO = "#9AA6BC";
+const AZUL = "#84CC16", CIANO = "#AAF807", TXT = "#F2F5FA", MUDO = "#9AA6BC";
 const SANS = "Inter, sans-serif", TIT = "'Space Grotesk', Inter, sans-serif";
 
 // Semana de treino: de domingo 20h até o domingo seguinte 20h (igual ao Perfil)
@@ -674,12 +674,12 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
   const k = H < 1500;   // post/quadrado: tudo mais compacto para sobrar espaço para a foto
   // fundo azul-escuro com brilhos
   const fundo = c.createLinearGradient(0, 0, 0, H);
-  fundo.addColorStop(0, "#071230"); fundo.addColorStop(0.55, "#06102A"); fundo.addColorStop(1, "#040A1C");
+  fundo.addColorStop(0, "#0E1608"); fundo.addColorStop(0.55, "#0A1006"); fundo.addColorStop(1, "#060904");
   c.fillStyle = fundo; c.fillRect(0, 0, W, H);
   const brilho = (x, y, raio, cor) => { const g = c.createRadialGradient(x, y, 0, x, y, raio); g.addColorStop(0, cor); g.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = g; c.fillRect(0, 0, W, H); };
-  brilho(0, 0, 520, "rgba(37,99,235,.45)");
-  brilho(W, H * 0.55, 620, "rgba(37,99,235,.22)");
-  brilho(W * 0.3, H, 700, "rgba(14,116,144,.18)");
+  brilho(0, 0, 520, "rgba(101,163,13,.45)");
+  brilho(W, H * 0.55, 620, "rgba(101,163,13,.22)");
+  brilho(W * 0.3, H, 700, "rgba(170,248,7,.07)");
   c.textBaseline = "alphabetic"; c.textAlign = "left";
 
   // topo: marca e etiqueta do treino
@@ -691,10 +691,10 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
   if (letra) {
     c.font = `700 38px ${SANS}`;
     const txt = `Treino ${letra}`, tw = c.measureText(txt).width + 72;
-    const g = c.createLinearGradient(W - M - tw, 0, W - M, 0); g.addColorStop(0, "#2563EB"); g.addColorStop(1, AZUL);
-    c.save(); c.shadowColor = "rgba(59,130,246,.55)"; c.shadowBlur = 30;
+    const g = c.createLinearGradient(W - M - tw, 0, W - M, 0); g.addColorStop(0, "#65A30D"); g.addColorStop(1, AZUL);
+    c.save(); c.shadowColor = "rgba(132,204,22,.55)"; c.shadowBlur = 30;
     c.fillStyle = g; roundRect(c, W - M - tw, 54, tw, 70, 35); c.fill(); c.restore();
-    c.strokeStyle = "rgba(147,197,253,.5)"; c.lineWidth = 2; roundRect(c, W - M - tw, 54, tw, 70, 35); c.stroke();
+    c.strokeStyle = "rgba(217,249,157,.5)"; c.lineWidth = 2; roundRect(c, W - M - tw, 54, tw, 70, 35); c.stroke();
     c.fillStyle = "#fff"; c.fillText(txt, W - M - tw + 36, 103);
   }
   const titulo = gruposTreinados(ser) || nome.replace(/^Treino\s+\S+\s*·?\s*/, "") || nome;
@@ -712,7 +712,7 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
     // compacto: até 3 recordes lado a lado
     const rs = recordes.slice(0, 3), ch = 178, top = y - ch, cw = (W - 2 * M - 48) / rs.length;
     c.save(); c.shadowColor = "rgba(34,211,238,.35)"; c.shadowBlur = 36;
-    c.fillStyle = "rgba(12,30,66,.75)"; roundRect(c, M, top, W - 2 * M, ch, 26); c.fill(); c.restore();
+    c.fillStyle = "rgba(18,30,10,.75)"; roundRect(c, M, top, W - 2 * M, ch, 26); c.fill(); c.restore();
     const borda = c.createLinearGradient(M, 0, W - M, 0); borda.addColorStop(0, CIANO); borda.addColorStop(1, AZUL);
     c.strokeStyle = borda; c.lineWidth = 3; roundRect(c, M, top, W - 2 * M, ch, 26); c.stroke();
     icone(c, "trofeu", M + 26, top + 22, 38, CIANO, 2);
@@ -731,7 +731,7 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
   } else if (recordes.length) {
     const rs = recordes.slice(0, 3), linha = 64, ch = 96 + rs.length * linha, top = y - ch;
     c.save(); c.shadowColor = "rgba(34,211,238,.35)"; c.shadowBlur = 36;
-    c.fillStyle = "rgba(12,30,66,.75)"; roundRect(c, M, top, W - 2 * M, ch, 26); c.fill(); c.restore();
+    c.fillStyle = "rgba(18,30,10,.75)"; roundRect(c, M, top, W - 2 * M, ch, 26); c.fill(); c.restore();
     const borda = c.createLinearGradient(M, 0, W - M, 0); borda.addColorStop(0, CIANO); borda.addColorStop(1, AZUL);
     c.strokeStyle = borda; c.lineWidth = 3; roundRect(c, M, top, W - 2 * M, ch, 26); c.stroke();
     icone(c, "trofeu", M + 50, top + (ch - 66) / 2, 66, CIANO, 1.8);
@@ -768,8 +768,8 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
   let x = M;
   dados.forEach(([ic, rot, v], i) => {
     const w = larg[i];
-    c.fillStyle = "rgba(15,30,62,.55)"; roundRect(c, x, stop, w, sh, 22); c.fill();
-    c.strokeStyle = "rgba(96,165,250,.28)"; c.lineWidth = 2; roundRect(c, x, stop, w, sh, 22); c.stroke();
+    c.fillStyle = "rgba(20,32,12,.55)"; roundRect(c, x, stop, w, sh, 22); c.fill();
+    c.strokeStyle = "rgba(170,248,7,.28)"; c.lineWidth = 2; roundRect(c, x, stop, w, sh, 22); c.stroke();
     const it = k ? 52 : 60;
     icone(c, ic, x + 26, stop + (sh - it) / 2, it, CIANO, 1.7);
     c.fillStyle = "#C9D3E6"; c.font = `500 ${k ? 26 : 28}px ${SANS}`; c.fillText(rot, x + it + 44, stop + (k ? 46 : 52));
@@ -789,8 +789,8 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
     const st = `🔥 ${extras.semana}º treino da semana`; c.font = `700 ${k ? 28 : 30}px ${SANS}`;
     const sw = c.measureText(st).width + 44, hh = k ? 54 : 58;
     if (sx === null) sx = W - M - sw;
-    c.fillStyle = k ? "rgba(7,18,48,.82)" : "rgba(59,130,246,.18)"; roundRect(c, sx, sy, sw, hh, hh / 2); c.fill();
-    c.strokeStyle = "rgba(96,165,250,.6)"; c.lineWidth = 2; roundRect(c, sx, sy, sw, hh, hh / 2); c.stroke();
+    c.fillStyle = k ? "rgba(8,14,4,.82)" : "rgba(132,204,22,.18)"; roundRect(c, sx, sy, sw, hh, hh / 2); c.fill();
+    c.strokeStyle = "rgba(170,248,7,.6)"; c.lineWidth = 2; roundRect(c, sx, sy, sw, hh, hh / 2); c.stroke();
     c.fillStyle = TXT; c.textBaseline = "middle"; c.fillText(st, sx + 22, sy + hh / 2 + 1); c.textBaseline = "alphabetic";
   };
   // no story o selo fica na linha das séries; no post vai por cima da foto (sobra mais espaço)
@@ -799,7 +799,7 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
   // faixa de luz entre a foto e os dados
   const yLuz = y - (k ? 70 : 90);
   const luz = c.createLinearGradient(0, 0, W, 0);
-  luz.addColorStop(0, "rgba(59,130,246,0)"); luz.addColorStop(0.5, "rgba(59,130,246,.18)"); luz.addColorStop(1, "rgba(96,165,250,.7)");
+  luz.addColorStop(0, "rgba(132,204,22,0)"); luz.addColorStop(0.5, "rgba(132,204,22,.18)"); luz.addColorStop(1, "rgba(170,248,7,.7)");
   c.strokeStyle = luz; c.lineWidth = 2; c.beginPath(); c.moveTo(0, yLuz + 30); c.quadraticCurveTo(W * 0.6, yLuz + 10, W, yLuz - 40); c.stroke();
 
   // área da foto
@@ -816,9 +816,9 @@ function pintar(c, W, H, { s, ser, volume, recordes }, img, previa, extras = {})
     const esc = Math.max(fw / img.width, fh / img.height), w = img.width * esc, hh = img.height * esc;
     c.drawImage(img, fx + (fw - w) / 2, fy + (fh - hh) / 2, w, hh);
     c.restore();
-    c.strokeStyle = "rgba(96,165,250,.35)"; c.lineWidth = 2; roundRect(c, fx, fy, fw, fh, 36); c.stroke();
+    c.strokeStyle = "rgba(170,248,7,.35)"; c.lineWidth = 2; roundRect(c, fx, fy, fw, fh, 36); c.stroke();
   } else {
-    c.fillStyle = "rgba(15,30,62,.35)"; roundRect(c, fx, fy, fw, fh, 36); c.fill();
+    c.fillStyle = "rgba(20,32,12,.35)"; roundRect(c, fx, fy, fw, fh, 36); c.fill();
     c.save(); if (previa) c.setLineDash([10, 9]); c.strokeStyle = "rgba(148,163,184,.55)"; c.lineWidth = 2.5; roundRect(c, fx, fy, fw, fh, 36); c.stroke(); c.restore();
     const cy = fy + fh / 2;
     c.textAlign = "center";
