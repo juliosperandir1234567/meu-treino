@@ -510,7 +510,8 @@ export async function telaFim(id) {
   const foto = s.foto_path ? await fotoUrl(s.foto_path) : null;
   const hm = (d) => d ? new Date(d).toTimeString().slice(0, 5) : "";
   render(`<section class="tela">
-    <div class="col" style="gap:6px"><span class="rot ac">Treino concluído</span><h1>${h(s.ficha_nome || "Treino")}</h1>
+    <div class="topo">${botaoVoltar("#/hoje")}<div class="tit"><span class="rot ac">Treino concluído</span></div></div>
+    <div class="col" style="gap:6px"><h1>${h(s.ficha_nome || "Treino")}</h1>
       <span class="peq mudo">${new Date(s.inicio).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</span></div>
     <div class="cartao" style="display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:8px">
       <label class="col" style="gap:2px"><span class="mini mudo">Início</span><input class="inp num" style="font-size:20px;font-weight:700;padding:0 6px;min-width:0" type="time" value="${hm(s.inicio)}" data-muda="horaSessao" data-id="${s.id}" data-campo="inicio"></label>

@@ -206,9 +206,13 @@ const P = {
 export function ico(nome, tam = 20, extra = "") {
   return `<svg width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${P[nome] || ""}</svg>`;
 }
+// quantas trocas de tela houve dentro do app (para o "voltar" ir para a tela anterior de verdade)
+let passos = 0;
+window.addEventListener("hashchange", () => { passos++; });
 export function botaoVoltar(hash) {
-  return `<a class="ico" href="${hash}" aria-label="Voltar">${ico("voltar")}</a>`;
+  return `<a class="ico" href="${hash}" data-acao="voltar" data-para="${hash}" aria-label="Voltar">${ico("voltar")}</a>`;
 }
+acoes.voltar = (el) => { if (passos > 0 && history.length > 1) { passos -= 2; history.back(); } else location.hash = el.dataset.para; };
 export function nav(atual) {
   const it = [["#/hoje", "peso", "Treino"], ["#/evolucao", "sobe", "Evolução"], ["#/perfil", "pessoa", "Perfil"]];
   if (["#/clientes", "#/historico", "#/conquistas", "#/lembrete"].includes(atual)) atual = "#/perfil";

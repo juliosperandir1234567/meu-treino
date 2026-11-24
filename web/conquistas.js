@@ -77,7 +77,7 @@ export async function telaConquistas() {
   }
 
   render(`<section class="tela">
-    <div class="topo">${botaoVoltar("#/semana")}<div class="tit"><h2>Calendário e conquistas</h2></div></div>
+    <div class="topo">${botaoVoltar("#/perfil")}<div class="tit"><h2>Calendário e conquistas</h2></div></div>
     <div class="grade3"><div class="stat"><span class="mini mudo">Treinos</span><span class="v">${e.treinos}</span></div>
       <div class="stat"><span class="mini mudo">Volume total</span><span class="v">${volumeTxt(e.volume)}</span></div>
       <div class="stat"><span class="mini mudo">Maior carga</span><span class="v">${e.cargaMax ? fmt(e.cargaMax) + " kg" : "—"}</span></div></div>

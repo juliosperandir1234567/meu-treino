@@ -1,5 +1,5 @@
 // Perfil: foto, nome, acesso e números de quem treina. Para o admin, atalho para o painel de clientes.
-import { sb, sessao, acoes, render, h, q, fmt, toast, ico, nav, fotoUrl, reduzir, enviarFoto, escolherFoto } from "./util.js";
+import { sb, sessao, acoes, render, h, q, fmt, toast, ico, nav, fotoUrl, reduzir, enviarFoto, escolherFoto, botaoVoltar } from "./util.js";
 
 export function iniciais(nome, email) {
   const base = (nome || "").trim() || (email || "").split("@")[0];
@@ -135,7 +135,7 @@ export async function telaHistorico() {
     sb.from("sessoes").select("id, ficha_nome, inicio, fim, foto_path, series_feitas(exercicio_nome)").not("fim", "is", null).order("inicio", { ascending: false }).limit(40)
       .then((r) => q(r).filter((s) => s.series_feitas?.length))]);
   render(`<section class="tela">
-    <div class="topo"><a class="ico" href="#/perfil" aria-label="Voltar">${ico("voltar")}</a><div class="tit"><h2>Meus treinos</h2><span class="mini mudo">Toque para pôr foto ou publicar</span></div></div>
+    <div class="topo">${botaoVoltar("#/perfil")}<div class="tit"><h2>Meus treinos</h2><span class="mini mudo">Toque para pôr foto ou publicar</span></div></div>
     ${ss.map((s) => cartaoTreinoFeito(s, avP)).join("") || `<div class="vazio">Nenhum treino finalizado ainda.</div>`}
   </section>${nav("#/perfil")}`);
 }

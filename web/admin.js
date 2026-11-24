@@ -52,7 +52,7 @@ export async function telaClientes() {
   const ativos = clientes.filter((c) => c.ativo && (!c.acesso_ate || c.acesso_ate >= hoje)).length;
   const vencendo = clientes.filter((c) => c.ativo && c.acesso_ate && c.acesso_ate >= hoje && c.acesso_ate <= somaDias(hoje, 5)).length;
   render(`<section class="tela">
-    <div class="entre"><h1>Clientes</h1><a class="btn peq pri" href="#/cliente/novo">${ico("mais", 16)} Novo</a></div>
+    <div class="entre"><div class="linha" style="gap:10px">${botaoVoltar("#/perfil")}<h1>Clientes</h1></div><a class="btn peq pri" href="#/cliente/novo">${ico("mais", 16)} Novo</a></div>
     <div class="grade3">
       <div class="stat"><span class="mini mudo">Total</span><span class="v">${clientes.length}</span></div>
       <div class="stat"><span class="mini mudo">Com acesso</span><span class="v ac">${ativos}</span></div>

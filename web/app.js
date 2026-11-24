@@ -171,24 +171,34 @@ function telaConfig() {
   <p class="mudo">Abra o arquivo <b>config.js</b> e cole a URL e a chave publishable do seu projeto Supabase. Depois publique de novo.</p></section>`);
 }
 function telaLogin() {
-  render(`<section class="tela" style="justify-content:center">
-    <div class="col" style="gap:6px;align-items:flex-start">
-      <span class="letra g">${ico("peso", 30)}</span>
-      <h1 style="margin-top:12px">Meu Treino</h1>
-      <p class="mudo" style="margin:0">Seu treino, suas cargas e sua evolução.</p>
+  render(`<section class="tela login">
+    <div class="lg-topo">
+      <span class="lg-logo" role="img" aria-label="Logo Meu Treino"></span>
+      <h1>Meu Treino</h1>
+      <p>Seu treino, suas cargas e sua evolução.</p>
     </div>
-    <form class="cartao" data-envia="entrar">
-      <label class="campo">E-mail<input class="inp" type="email" name="email" autocomplete="email" required></label>
-      <label class="campo">Senha<input class="inp" type="password" name="senha" autocomplete="current-password" minlength="6" required></label>
-      <button class="btn pri blk" type="submit">Entrar</button>
+    <form class="lg-form" data-envia="entrar">
+      <label class="lg-campo"><span>E-mail</span><input type="email" name="email" autocomplete="email" inputmode="email" placeholder="seu@email.com" required></label>
+      <label class="lg-campo"><span>Senha</span><span class="lg-senha"><input type="password" name="senha" autocomplete="current-password" minlength="6" placeholder="Sua senha" required>
+        <button type="button" class="lg-ver" data-acao="verSenha" aria-label="Mostrar senha">Mostrar</button></span></label>
+      <button class="btn pri blk grande" type="submit">Entrar</button>
     </form>
-    <p class="mini mudo" style="margin:0;text-align:center">Ainda não tem acesso? Fale com quem te vendeu o app.</p>
-    <a class="mini mudo" style="text-align:center" href="termos.html">Termos de uso e Privacidade</a></section>`);
+    <div class="lg-rodape">
+      <p>Ainda não tem acesso? Fale com quem te vendeu o app.</p>
+      <a href="termos.html">Termos de uso e Privacidade</a>
+    </div>
+  </section>`);
 }
+acoes.verSenha = (el) => {
+  const inp = el.parentElement.querySelector("input");
+  const ver = inp.type === "password"; inp.type = ver ? "text" : "password";
+  el.textContent = ver ? "Esconder" : "Mostrar"; el.setAttribute("aria-label", ver ? "Esconder senha" : "Mostrar senha");
+};
 acoes.entrar = async (form) => {
   const f = new FormData(form);
-  const { error } = await sb.auth.signInWithPassword({ email: f.get("email"), password: f.get("senha") });
-  if (error) toast(error.message.includes("Invalid") ? "E-mail ou senha incorretos" : error.message, 4000);
+  const bt = form.querySelector("[type=submit]"); bt.disabled = true; bt.innerHTML = '<span class="girando"></span> Entrando…';
+  const { error } = await sb.auth.signInWithPassword({ email: String(f.get("email")).trim(), password: f.get("senha") });
+  if (error) { toast(error.message.includes("Invalid") ? "E-mail ou senha incorretos" : error.message, 4000); bt.disabled = false; bt.textContent = "Entrar"; }
 };
 acoes.sair = async () => {
   const n = pendentes();

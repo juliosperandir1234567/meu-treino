@@ -453,3 +453,24 @@ nav.nav a.at svg { background: var(--lima); color: var(--preto); border-radius: 
 .menu-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border: 0; border-bottom: 1px solid var(--borda); background: none; text-decoration: none; color: var(--txt); width: 100%; text-align: left; font: inherit; }
 .menu-item:last-child { border-bottom: 0; }
 .mi-ic { width: 36px; height: 36px; border-radius: 10px; background: var(--s2); display: grid; place-items: center; flex: none; }
+
+/* ===== login ===== */
+body:has(.login) { background: #0A0F05; }
+.tela.login { min-height: 100dvh; justify-content: center; gap: 26px; color: #fff;
+  background: radial-gradient(120% 60% at 50% 0%, rgba(170,248,7,.16), transparent 60%), #0A0F05; margin: 0; }
+.lg-topo { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+.lg-logo { width: 104px; height: 104px; border-radius: 26px; background: url(logo.png) center/cover; box-shadow: 0 12px 40px rgba(170,248,7,.28); animation: lgEntra .7s cubic-bezier(.2,1.5,.4,1) both; margin-bottom: 8px; }
+.lg-topo h1 { color: #fff; font-size: 32px; }
+.lg-topo p { margin: 0; color: #A3AE94; font-size: 15px; }
+.lg-form { display: flex; flex-direction: column; gap: 14px; background: #141C0A; border: 1px solid #243012; border-radius: 22px; padding: 18px; }
+.lg-campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #C5CFB6; }
+.lg-campo input { width: 100%; min-height: 52px; border-radius: 14px; border: 1px solid #2E3B1A; background: #0A0F05; color: #fff; font-size: 16px; padding: 0 14px; }
+.lg-campo input::placeholder { color: #5F6B52; }
+.lg-campo input:focus { outline: none; border-color: var(--lima); box-shadow: 0 0 0 3px rgba(170,248,7,.18); }
+.lg-senha { position: relative; display: block; }
+.lg-senha input { padding-right: 92px; }
+.lg-ver { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: 0; color: var(--lima); font-weight: 700; font-size: 13px; padding: 8px; }
+.lg-rodape { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.lg-rodape p { margin: 0; color: #8C977E; font-size: 13px; }
+.lg-rodape a { color: #A3AE94; font-size: 13px; }
+@keyframes lgEntra { 0% { transform: scale(.4) rotate(-14deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
