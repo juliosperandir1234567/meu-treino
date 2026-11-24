@@ -13,6 +13,9 @@
   <link rel="icon" href="icon-180.png?v=3" type="image/png">
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://esm.sh" crossorigin>
+  <link rel="preconnect" href="https://dmgyqjyrtnyxqyaeowfa.supabase.co" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500;1,700;1,800&family=Space+Grotesk:wght@500;600;700&family=Barlow+Condensed:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <style>
@@ -33,10 +36,10 @@
 <body>
   <div id="abertura" aria-hidden="true"><span class="lg"></span><span class="nm">Meu Treino</span><span class="br"><i></i></span></div>
   <script>
-    // tira a abertura quando a primeira tela aparece (mínimo 1,2 s para a animação, máximo 5 s)
+    // tira a abertura quando a primeira tela aparece (mínimo 0,5 s para a animação, máximo 5 s)
     (function () {
       var t0 = Date.now(), feito = false;
-      function sair() { if (feito) return; feito = true; var a = document.getElementById("abertura"); setTimeout(function () { a.classList.add("sai"); setTimeout(function () { a.remove(); }, 500); }, Math.max(0, 1200 - (Date.now() - t0))); }
+      function sair() { if (feito) return; feito = true; var a = document.getElementById("abertura"); setTimeout(function () { a.classList.add("sai"); setTimeout(function () { a.remove(); }, 500); }, Math.max(0, 500 - (Date.now() - t0))); }
       new MutationObserver(function (m, o) { var app = document.getElementById("app"); if (app && !app.querySelector(".carregando")) { o.disconnect(); sair(); } }).observe(document.documentElement, { childList: true, subtree: true });
       setTimeout(sair, 5000);
     })();

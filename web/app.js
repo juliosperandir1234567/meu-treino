@@ -53,7 +53,18 @@ async function rota(tentou = false) {
   if (!sessao.user) return telaLogin();
   if (!sessao.perfil || sessao.perfil.id !== sessao.user.id) {
     const chP = "perfil-" + sessao.user.id;
-    try {
+    // abre na hora com o perfil guardado no celular e confere com o servidor por trás
+    // (o servidor bloqueia os dados de quem estiver sem acesso de qualquer forma)
+    let guard = null; try { guard = JSON.parse(localStorage.getItem(chP)); } catch { /* */ }
+    if (guard && guard.id === sessao.user.id && navigator.onLine) {
+      sessao.perfil = guard;
+      buscarPerfil().then((p) => {
+        if (!p) return;
+        const mudou = motivoBloqueio(p) !== motivoBloqueio(guard) || !!p.termos_em !== !!guard.termos_em;
+        sessao.perfil = p; try { localStorage.setItem(chP, JSON.stringify(p)); } catch { /* */ }
+        if (mudou) rota();
+      }).catch(() => {});
+    } else try {
       let p;
       // ao abrir o app depois de horas o acesso pode estar vencendo: renova e tenta de novo uma vez
       try { p = await buscarPerfil(); } catch (e1) { if (!navigator.onLine) throw e1; await sb.auth.refreshSession().catch(() => {}); p = await buscarPerfil(); }
