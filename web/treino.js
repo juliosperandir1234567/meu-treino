@@ -571,7 +571,7 @@ let layoutAtual = null;     // área da foto no último desenho (para arrastar e
 const LIMA = "#B5FF00", BRANCO = "#FFFFFF", CINZA = "#C9CCC4";
 const ESPORTE = "'Barlow Condensed', 'Arial Narrow', sans-serif", SANS = "Inter, sans-serif";
 let simbolo = null;
-const carregarSimbolo = () => simbolo || (simbolo = carregarImagem("simbolo.png").catch(() => null));
+const carregarSimbolo = () => simbolo || (simbolo = carregarImagem("logo.png").catch(() => null));
 
 export async function telaPublicar(id) {
   if (formato !== "story" && formato !== "post") formato = "story";
@@ -644,7 +644,7 @@ function limitar(aj) {
 // posições de tudo, de baixo para cima, conforme o formato (sem esticar nada)
 function layout(W, H) {
   const story = H > 1500, k = story ? 1 : 0.86, M = 48;
-  return { story, k, M, topoLogo: story ? 46 : 34, alturaLogo: Math.round((story ? 88 : 70)), fx: M, fy: story ? 170 : 128, fw: W - 2 * M, fh: 0 };
+  return { story, k, M, topoLogo: story ? 46 : 34, alturaLogo: story ? 104 : 80, fx: M, fy: story ? 186 : 140, fw: W - 2 * M, fh: 0 };
 }
 function quebrarLinhas(c, txt, max, linhasMax, tam0, min) {
   for (let t = tam0; t >= min; t -= 4) {
