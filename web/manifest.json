@@ -1,7 +1,7 @@
 {
   "name": "Meu Treino",
   "short_name": "Meu Treino",
-  "start_url": "./#/perfil",
+  "start_url": "./#/hoje",
   "display": "standalone",
   "background_color": "#0A0F05",
   "theme_color": "#F3F6FB",
